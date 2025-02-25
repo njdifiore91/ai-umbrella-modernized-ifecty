@@ -1,0 +1,113 @@
+# Prometheus server configuration for ai_umbrella application
+# Version: 2.45.0
+
+# Global configuration
+global:
+  scrape_interval: 10s     # Set the scrape interval to every 10 seconds
+  evaluation_interval: 10s # Evaluate rules every 10 seconds
+
+# Scrape configurations containing endpoints to scrape
+scrape_configs:
+  # Direct scraping of umbrella-backend service
+  - job_name: 'umbrella-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['umbrella-backend:8080']
+
+  # Spring Boot Actuator endpoints in Kubernetes
+  - job_name: 'spring-boot-actuator'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['default', 'umbrella']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+        action: replace
+      - source_labels: [__meta_kubernetes_pod_label_version]
+        target_label: version
+        action: replace
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+        action: replace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+        action: replace
+
+  # Service monitor configuration for Kubernetes services
+  - job_name: 'service-monitors'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['default', 'umbrella']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+  
+  # Alert rules
+  rules:
+    # High Response Time Alert
+    - name: HighResponseTime
+      expr: http_server_requests_seconds_max > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: High response time detected
+        description: Response time exceeds 2 seconds for {{ $labels.instance }}
+
+    # High Error Rate Alert
+    - name: HighErrorRate
+      expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) > 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: High error rate detected
+        description: Error rate exceeds threshold for {{ $labels.instance }}
+
+    # JVM Memory Usage Alert
+    - name: HighJVMMemoryUsage
+      expr: jvm_memory_used_bytes / jvm_memory_max_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: High JVM memory usage
+        description: JVM memory usage above 90% for {{ $labels.instance }}
+
+    # Virtual Thread Starvation Alert
+    - name: VirtualThreadStarvation
+      expr: jvm_threads_virtual_count > 1000
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: High virtual thread count
+        description: Virtual thread count exceeds threshold for {{ $labels.instance }}
