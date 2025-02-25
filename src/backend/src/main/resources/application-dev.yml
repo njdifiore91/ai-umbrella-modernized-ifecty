@@ -1,0 +1,88 @@
+# Development Environment Configuration for Umbrella Insurance Application
+# Spring Boot 3.2.1 with embedded Tomcat 10.1.18 and Java 21 Virtual Threads support
+
+spring:
+  application:
+    name: umbrella-insurance-dev
+
+  # Enable Virtual Threads for improved concurrency in development
+  threads:
+    virtual:
+      enabled: true
+
+  # Development database configurations with HikariCP
+  datasource:
+    primary:
+      url: jdbc:sqlserver://localhost:1433;databaseName=UMBRELLA_DEV
+      username: ${DB_USER}
+      password: ${DB_PASSWORD}
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    secondary:
+      url: jdbc:db2://localhost:50000/UMBRELLA_DEV
+      username: ${DB2_USER}
+      password: ${DB2_PASSWORD}
+      driver-class-name: com.ibm.db2.jcc.DB2Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  # JPA development configuration with SQL logging
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+      format_sql: true
+
+# Development server configuration
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-stacktrace: always
+    include-message: always
+    include-binding-errors: always
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    threads:
+      max: 50
+      min-spare: 5
+
+# Development monitoring configuration with all endpoints exposed
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ['*']
+  endpoint:
+    health:
+      show-details: always
+
+# Development logging configuration with detailed SQL logging
+logging:
+  level:
+    root: INFO
+    com.prcins.umbrella: DEBUG
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/umbrella-dev.log
+
+# Development integration service endpoints
+integration:
+  policystar:
+    url: http://localhost:8081/policystar
+    timeout: 30000
+  rmv:
+    url: http://localhost:8082/rmv
+    timeout: 30000
+  speedpay:
+    url: http://localhost:8083/speedpay
+    timeout: 30000
+  clue:
+    url: http://localhost:8084/clue
+    timeout: 30000
