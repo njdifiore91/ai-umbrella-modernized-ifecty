@@ -1,0 +1,100 @@
+# QA environment-specific values for ai_umbrella Helm chart
+# Optimized for Java 21 and Spring Boot 3.2.x with embedded Tomcat 10.1.18
+
+# Backend service configuration
+backend:
+  image:
+    repository: harbor.prcins.net/umbrella/backend
+    tag: qa
+    pullPolicy: Always
+  
+  replicaCount: 2
+  
+  # Spring Boot profile and environment configuration
+  springProfiles: qa
+  
+  # Resource allocation optimized for QA testing
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # JVM configuration optimized for Java 21 with Virtual Threads
+  env:
+    JAVA_OPTS: >-
+      -XX:+UseZGC
+      -XX:+ZGenerational
+      -Xmx1536m
+      -XX:+UseCompressedOops
+      -Dspring.profiles.active=qa
+  
+  # Aggressive autoscaling for thorough testing
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 75
+
+# Web frontend configuration
+web:
+  image:
+    repository: harbor.prcins.net/umbrella/web
+    tag: qa
+    pullPolicy: Always
+  
+  replicaCount: 2
+  
+  # Resource allocation for web tier
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  
+  # Web tier autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 75
+
+# QA environment ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: qa.umbrella.prcins.net
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Enhanced monitoring for QA testing
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 20s
+    path: /actuator/prometheus
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: container_cpu_usage_seconds_total{container=~"umbrella-.*"} > 0.75
+        for: 5m
+        severity: warning
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container=~"umbrella-.*"} > 0.75
+        for: 5m
+        severity: warning
+      - alert: SpringBootHealthCheck
+        expr: spring_boot_actuator_health{job="umbrella"} != 1
+        for: 2m
+        severity: critical
