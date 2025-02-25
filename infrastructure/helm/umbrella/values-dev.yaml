@@ -1,0 +1,97 @@
+# Development environment values for ai_umbrella Helm chart
+# Inherits and overrides values from values.yaml
+
+backend:
+  image:
+    repository: harbor.prcins.net/umbrella/backend
+    tag: dev
+    pullPolicy: Always
+  
+  # Single replica for development
+  replicaCount: 1
+  
+  # Development Spring Boot profile
+  springProfiles: dev
+  
+  # Reduced resource allocation for development
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # Development JVM configuration with remote debugging enabled
+  env:
+    JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xmx1536m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005"
+  
+  # Disable autoscaling in development
+  autoscaling:
+    enabled: false
+  
+  # Increased probe delays for debugging
+  livenessProbe:
+    initialDelaySeconds: 90
+    periodSeconds: 30
+  
+  readinessProbe:
+    initialDelaySeconds: 45
+    periodSeconds: 20
+
+web:
+  image:
+    repository: harbor.prcins.net/umbrella/web
+    tag: dev
+    pullPolicy: Always
+  
+  # Single replica for development
+  replicaCount: 1
+  
+  # Reduced resource allocation for development
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Disable autoscaling in development
+  autoscaling:
+    enabled: false
+
+# Development ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: dev.umbrella.prcins.net
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Development monitoring configuration with increased frequency
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: container_cpu_usage_seconds_total{container=~"umbrella-.*"} > 0.8
+        for: 5m
+        severity: warning
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container=~"umbrella-.*"} > 0.8
+        for: 5m
+        severity: warning
+
+# Development persistence configuration
+persistence:
+  enabled: true
+  storageClass: standard
+  size: 10Gi
