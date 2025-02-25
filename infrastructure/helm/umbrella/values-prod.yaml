@@ -1,0 +1,133 @@
+# Production values for ai_umbrella Helm chart
+# Inherits and overrides values from values.yaml
+
+# Backend service configuration
+backend:
+  image:
+    repository: harbor.prcins.net/umbrella/backend
+    tag: stable  # Production uses stable tag
+    pullPolicy: Always  # Ensure latest stable image
+  
+  replicaCount: 4  # Higher replica count for production
+  
+  # Production Spring Boot profile
+  springProfiles: prod
+  
+  # Production-grade resource allocation
+  resources:
+    requests:
+      cpu: 2000m  # 2 CPU cores minimum
+      memory: 4Gi # 4GB minimum memory
+    limits:
+      cpu: 4000m  # 4 CPU cores maximum
+      memory: 8Gi # 8GB maximum memory
+  
+  # Production JVM settings optimized for Java 21
+  env:
+    JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xmx6144m -XX:+HeapDumpOnOutOfMemoryError"
+  
+  # Production autoscaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 75
+  
+  # Production-tuned health check probes
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 90
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Web frontend configuration
+web:
+  image:
+    repository: harbor.prcins.net/umbrella/web
+    tag: stable
+    pullPolicy: Always
+  
+  replicaCount: 4
+  
+  # Production resource allocation for web tier
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  # Production web autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+  
+  # Production web health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 45
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Production ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: umbrella.prcins.net
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: umbrella-tls
+      hosts:
+        - umbrella.prcins.net
+
+# Production monitoring configuration
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s  # More frequent monitoring in production
+    path: /actuator/prometheus
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: container_cpu_usage_seconds_total{container=~"umbrella-.*"} > 0.85
+        for: 5m
+        severity: critical
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container=~"umbrella-.*"} > 0.85
+        for: 5m
+        severity: critical
+      - alert: HighLatency
+        expr: http_server_requests_seconds_max{application="umbrella"} > 2
+        for: 5m
+        severity: warning
+
+# Production persistence configuration
+persistence:
+  enabled: true
+  storageClass: premium-rwo  # Production-grade storage
+  size: 50Gi  # Larger storage for production
