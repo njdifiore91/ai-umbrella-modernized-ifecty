@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: umbrella-web
+  namespace: umbrella
+  labels:
+    app: umbrella-web
+    environment: ${ENV}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/actuator/prometheus"
+spec:
+  # Configure auto-scaling with default replicas
+  replicas: 3
+  selector:
+    matchLabels:
+      app: umbrella-web
+  
+  # Define rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+
+  template:
+    metadata:
+      labels:
+        app: umbrella-web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      # Configure security context for pod
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: umbrella-web
+        image: harbor.prcins.net/umbrella/web:${VERSION}
+        imagePullPolicy: Always
+        
+        # Configure security context for container
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 101
+          capabilities:
+            drop:
+            - ALL
+
+        # Define container ports
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: actuator
+          containerPort: 8081
+          protocol: TCP
+
+        # Configure resource limits and requests
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+
+        # Configure health probes using Spring Boot Actuator endpoints
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 5
+
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 30
+
+        # Mount configuration from ConfigMap
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: file:/app/config/
+        - name: SPRING_PROFILES_ACTIVE
+          value: ${ENV}
+        - name: SERVER_PORT
+          value: "8080"
+        - name: MANAGEMENT_SERVER_PORT
+          value: "8081"
+
+      volumes:
+      - name: config-volume
+        configMap:
+          name: umbrella-web-config
+      - name: tmp-volume
+        emptyDir: {}
+
+      # Configure pod termination grace period
+      terminationGracePeriodSeconds: 60
+
+      # Configure image pull secrets if needed
+      imagePullSecrets:
+      - name: harbor-registry-secret
