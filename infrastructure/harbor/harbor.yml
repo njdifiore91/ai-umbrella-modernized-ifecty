@@ -1,0 +1,172 @@
+# Harbor Enterprise Registry Configuration v2.9.1
+# Enhanced configuration for Spring Boot container support and security
+
+# Core Settings
+hostname: harbor.prcins.net
+http:
+  port: 80
+https:
+  port: 443
+  certificate: /etc/harbor/ssl/harbor.crt
+  private_key: /etc/harbor/ssl/harbor.key
+
+# External URL
+external_url: https://harbor.prcins.net
+
+# Database Configuration with optimized connection pooling
+database:
+  type: postgresql
+  host: harbor-database
+  port: 5432
+  username: ${DB_USER}
+  password: ${DB_PASSWORD}
+  # Enhanced connection pool settings for high concurrency
+  max_idle_conns: 100
+  max_open_conns: 900
+  ssl_mode: disable
+
+# Redis Configuration with performance tuning
+redis:
+  host: harbor-redis
+  port: 6379
+  password: ${REDIS_PASSWORD}
+  # Dedicated database indexes for different services
+  registry_db_index: 1
+  job_service_db_index: 2
+  chart_museum_db_index: 3
+  # Connection pool settings
+  pool_size: 100
+  idle_timeout_seconds: 300
+
+# Storage Configuration with quota management
+storage:
+  provider: filesystem
+  root_directory: /data
+  max_size_gb: 50
+  maintenance:
+    gc:
+      enabled: true
+      cron: "0 2 * * *"
+    purge:
+      enabled: true
+      cron: "0 3 * * *"
+
+# Security Configuration with comprehensive scanning
+security:
+  # Admin password
+  admin_password: ${HARBOR_ADMIN_PASSWORD}
+  secret_key: ${HARBOR_SECRET_KEY}
+  
+  # Vulnerability Scanning
+  vulnerability_scanning:
+    enabled: true
+    clair:
+      updaters_interval: "12h"
+      vulnerability_sources:
+        - "alpine"
+        - "debian"
+        - "ubuntu"
+      retention_days: 90
+    
+  # Image Signing
+  image_signing:
+    enabled: true
+    notary_url: https://notary.prcins.net
+    token_expiration: 30
+    
+  # Access Control
+  auth_mode: db_auth
+  self_registration: false
+  project_creation_restriction: adminonly
+  
+  # Token Service
+  token_service:
+    issuer: harbor-token-issuer
+    expiration: 30
+
+# Monitoring and Metrics Configuration
+monitoring:
+  # Prometheus metrics endpoint
+  metrics:
+    enabled: true
+    port: 9090
+    path: /metrics
+    
+  # Health check endpoint
+  health_check:
+    enabled: true
+    port: 8080
+    path: /api/v2.0/health
+    
+  # Audit logging
+  audit_log:
+    enabled: true
+    retention_days: 90
+
+# Registry Settings
+registry:
+  # Registry storage driver
+  storage_provider: filesystem
+  
+  # Image layer caching
+  cache:
+    enabled: true
+    provider: redis
+    
+  # Middleware settings
+  middleware:
+    registry:
+      - name: proxy
+        endpoint: https://registry-1.docker.io
+    repository:
+      - name: proxy
+        endpoint: https://registry-1.docker.io
+
+# Job Service Configuration
+jobservice:
+  max_job_workers: 10
+  job_loggers:
+    - file
+    - database
+  logger_sweeper_duration: 14
+
+# Spring Boot Container Support
+spring_boot:
+  # Enhanced tagging for Spring Boot images
+  tag_templates:
+    - "{{.Version}}"
+    - "{{.Version}}-{{.Timestamp}}"
+    - "{{.Branch}}-{{.Commit}}"
+  
+  # Automated vulnerability scanning for Spring Boot base images
+  base_image_scanning:
+    enabled: true
+    cron: "0 0 * * *"
+    
+  # Spring Boot specific metadata
+  metadata:
+    enabled: true
+    annotations:
+      - spring-boot.version
+      - java.version
+
+# Notification Configuration
+notification:
+  enabled: true
+  webhook:
+    - name: spring-boot-webhook
+      url: http://webhook.prcins.net/harbor
+      events:
+        - SCANNING_COMPLETED
+        - SCANNING_FAILED
+        - PUSH_ARTIFACT
+        - PULL_ARTIFACT
+      skip_cert_verify: false
+
+# System Volume Quotas
+quota:
+  enabled: true
+  default_project_quota_gb: 5
+  storage_per_project:
+    enabled: true
+    capacity_gb: 50
