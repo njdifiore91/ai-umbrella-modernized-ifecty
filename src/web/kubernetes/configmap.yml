@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: umbrella-web-config
+  namespace: umbrella
+  labels:
+    app: umbrella-web
+    environment: ${ENV}
+    version: ${VERSION}
+  annotations:
+    description: "Web frontend configuration for Umbrella application"
+    lastUpdated: ${TIMESTAMP}
+data:
+  # API Configuration
+  api.json: |
+    {
+      "base_url": "https://apimstest.prcins.net/umbrellacore/api/v1",
+      "headers": {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      "timeout": 60000,
+      "retry_attempts": 3,
+      "retry_delay": 1000,
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "reset_timeout": 60000
+      },
+      "endpoints": {
+        "auth": {
+          "login": "/auth/login",
+          "logout": "/auth/logout",
+          "refresh_token": "/auth/refresh",
+          "verify_token": "/auth/verify"
+        },
+        "policies": {
+          "get_all": "/policies",
+          "get_by_id": "/policies/:id",
+          "create": "/policies",
+          "update": "/policies/:id",
+          "delete": "/policies/:id",
+          "export": "/policies/:id/export"
+        },
+        "claims": {
+          "get_all": "/claims",
+          "get_by_id": "/claims/:id",
+          "create": "/claims",
+          "update": "/claims/:id",
+          "delete": "/claims/:id",
+          "upload_document": "/claims/:id/documents",
+          "process_payment": "/claims/:id/payments"
+        }
+      }
+    }
+
+  # Validation Configuration
+  validation.json: |
+    {
+      "max_file_size": 10485760,
+      "max_policy_amount": 10000000,
+      "min_policy_amount": 1000,
+      "allowed_file_types": ".pdf,.jpg,.png,.doc,.docx",
+      "max_upload_files": 10,
+      "patterns": {
+        "email": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+        "ssn": "^\\d{3}-\\d{2}-\\d{4}$",
+        "phone": "^\\d{3}-\\d{3}-\\d{4}$",
+        "policy_number": "^POL-\\d{4}-\\d{6}$",
+        "claim_number": "^CLM-\\d{4}-\\d{3}$"
+      }
+    }
+
+  # NGINX Configuration
+  nginx.conf: |
+    client_max_body_size 50m;
+    client_body_timeout 60s;
+    keepalive_timeout 65s;
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    server_tokens off;
+
+    server {
+      listen 80;
+      server_name umbrella-web;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location / {
+        try_files $uri $uri/ /index.html;
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-XSS-Protection "1; mode=block";
+        add_header X-Content-Type-Options "nosniff";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://apimstest.prcins.net;";
+        add_header Referrer-Policy "strict-origin-when-cross-origin";
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()";
+      }
+
+      error_page 404 /404.html;
+      error_page 500 502 503 504 /50x.html;
+
+      location = /50x.html {
+        root /usr/share/nginx/html;
+      }
+
+      client_body_buffer_size 128k;
+      proxy_buffer_size 128k;
+      proxy_buffers 4 256k;
+      proxy_busy_buffers_size 256k;
+    }
+
+  # Feature Flags
+  features.json: |
+    {
+      "enable_caching": true,
+      "enable_compression": true,
+      "enable_metrics": true,
+      "enable_health_check": true,
+      "enable_rate_limiting": true,
+      "rate_limit": {
+        "requests_per_second": 100,
+        "burst": 200
+      }
+    }
