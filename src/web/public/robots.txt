@@ -1,0 +1,75 @@
+# Enterprise Insurance Application Robots Exclusion Protocol
+# Version: 2.0
+# Last Updated: 2024
+# Purpose: Enforce strict security controls for web crawler access
+
+# Default crawler policy - restrict access to sensitive paths
+User-agent: *
+# Core application paths
+Disallow: /api/
+Disallow: /auth/
+Disallow: /claims/
+Disallow: /policy/
+Disallow: /user/
+Disallow: /settings/
+# Management and internal paths  
+Disallow: /actuator/
+Disallow: /management/
+Disallow: /admin/
+Disallow: /internal/
+Disallow: /config/
+Disallow: /secure/
+Disallow: /private/
+# Prevent access to configuration and data files
+Disallow: /*.json
+Disallow: /*.xml
+Disallow: /*.properties
+Disallow: /*.yml
+Disallow: /*.yaml
+# Allowed public paths
+Allow: /
+Allow: /login
+Allow: /public/
+Allow: /about/
+Allow: /contact/
+Allow: /resources/public/
+# Rate limiting
+Crawl-delay: 20
+
+# Google-specific crawler policy
+User-agent: Googlebot
+# Core application paths
+Disallow: /api/
+Disallow: /auth/
+Disallow: /claims/
+Disallow: /policy/
+Disallow: /user/
+Disallow: /settings/
+# Management and internal paths
+Disallow: /actuator/
+Disallow: /management/
+Disallow: /admin/
+Disallow: /internal/
+Disallow: /config/
+Disallow: /secure/
+Disallow: /private/
+# Prevent access to configuration and data files
+Disallow: /*.json
+Disallow: /*.xml
+Disallow: /*.properties
+Disallow: /*.yml
+Disallow: /*.yaml
+# Allowed public paths
+Allow: /
+Allow: /login
+Allow: /public/
+Allow: /about/
+Allow: /contact/
+Allow: /resources/public/
+# Rate limiting
+Crawl-delay: 20
+
+# Security Notice:
+# This robots.txt implements strict access controls to protect sensitive insurance data.
+# Unauthorized access attempts are monitored and logged.
+# For inquiries, contact: security@umbrella-insurance.com
