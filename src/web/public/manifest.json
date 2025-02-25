@@ -1,0 +1,81 @@
+{
+  "short_name": "ai_umbrella",
+  "name": "ai_umbrella Insurance Management",
+  "description": "Enterprise-grade insurance domain application for comprehensive insurance management capabilities",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "assets/images/logo.svg",
+      "sizes": "240x60",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/images/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/images/logo-512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "orientation": "any",
+  "scope": "/",
+  "categories": [
+    "insurance",
+    "business", 
+    "finance"
+  ],
+  "lang": "en-US",
+  "prefer_related_applications": false,
+  "display_override": [
+    "standalone",
+    "browser"
+  ],
+  "shortcuts": [
+    {
+      "name": "Policy Management",
+      "url": "/policy",
+      "description": "Access policy management interface"
+    },
+    {
+      "name": "Claims Processing", 
+      "url": "/claims",
+      "description": "Access claims processing interface"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/policy.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Policy Management Interface"
+    }
+  ],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "id": "ai-umbrella-insurance-management",
+  "dir": "ltr",
+  "related_applications": [],
+  "protocol_handlers": [
+    {
+      "protocol": "web+aiumbrellapolicy",
+      "url": "/policy?id=%s"
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}
