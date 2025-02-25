@@ -1,0 +1,117 @@
+# Kibana Configuration for ai_umbrella System
+# Version: 7.17.0
+
+# Server Configuration
+server.name: umbrella-kibana
+server.host: "0.0.0.0"
+server.port: 5601
+server.basePath: ""
+server.rewriteBasePath: false
+server.maxPayloadBytes: 5242880
+server.compression:
+  enabled: true
+  referrerWhitelist: ["umbrella-domain.com"]
+
+# Elasticsearch Connection
+elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  requestTimeout: 30000
+  shardTimeout: 30000
+  startupTimeout: 5000
+  pingTimeout: 1500
+  logQueries: true
+
+# Security Configuration
+xpack.security:
+  enabled: true
+  encryptionKey: "${KIBANA_ENCRYPTION_KEY}"
+  session:
+    idleTimeout: "1h"
+    lifespan: "24h"
+  audit:
+    enabled: true
+
+# Monitoring Configuration
+xpack.monitoring:
+  enabled: true
+  kibana.collection:
+    enabled: true
+  max_bucket_size: 10000
+  min_interval_seconds: 10
+  ui.container.elasticsearch.enabled: true
+
+# Logging Configuration
+logging:
+  dest: /var/log/kibana/kibana.log
+  json: true
+  rotate:
+    enabled: true
+    interval: "1d"
+    size: "100m"
+  useUTC: true
+
+# UI Configuration
+kibana:
+  index: ".kibana"
+  defaultAppId: "home"
+  autocompleteTimeout: "1000"
+  autocompleteTerminateAfter: 100000
+
+# Container-Specific Settings
+server.ssl:
+  enabled: false # SSL termination handled by container platform
+
+# Performance Optimization
+ops:
+  interval: 5000
+  cGroupOverrides:
+    cpuPath: "/proc/self/cgroup"
+    cpuAcctPath: "/sys/fs/cgroup/cpu"
+
+# Telemetry Settings
+telemetry:
+  enabled: false
+  allowChangingOptInStatus: false
+
+# Feature Controls
+xpack.reporting:
+  enabled: true
+  capture:
+    timeouts:
+      waitForElements: 5000
+  csv:
+    maxSizeBytes: 10485760
+    scroll:
+      duration: "30s"
+      size: 500
+
+# APM Settings
+xpack.apm.ui:
+  enabled: true
+  transactionGroupBucketSize: 100
+
+# Search Settings
+search:
+  timeout:
+    shardTimeout: "30s"
+    searchTimeout: "30s"
+  batchedReduceSize: 512
+
+# Map Settings
+map:
+  includeElasticMapsService: false
+
+# Saved Objects Settings
+savedObjects:
+  maxImportPayloadBytes: 26214400
+  maxImportExportSize: 10000
+
+# Status Page Settings
+status:
+  allowAnonymous: false
+  v6ApiFormat: true
+
+# Container Health Check Settings
+healthCheck:
+  delay: 5000
+  maxRetries: 3
