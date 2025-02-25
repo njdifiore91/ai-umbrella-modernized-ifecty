@@ -1,0 +1,121 @@
+# Grafana dashboard provisioning configuration for ai_umbrella application
+# Version: 10.2.0
+
+apiVersion: 1
+
+# Providers configuration for automated dashboard provisioning
+providers:
+  # Main dashboard provider for umbrella application
+  - name: 'umbrella-dashboards'
+    orgId: 1
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      # Path to dashboard JSON files
+      path: /etc/grafana/dashboards
+      # Enable folder creation based on file structure
+      foldersFromFilesStructure: true
+
+# Dashboard configuration
+dashboards:
+  # Application metrics dashboard with Virtual Thread monitoring
+  - name: 'application-metrics'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards/application-metrics.json
+      datasource: Prometheus
+    editable: false
+    message: "Managed by ai_umbrella provisioning"
+    overwrite: true
+    version: 1
+
+  # JVM metrics dashboard with Java 21 features
+  - name: 'jvm-metrics'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards/jvm-metrics.json
+      datasource: Prometheus
+    editable: false
+    message: "Managed by ai_umbrella provisioning"
+    overwrite: true
+    version: 1
+
+# Provisioning settings
+settings:
+  # Auto-update configuration
+  autoUpdate:
+    enabled: true
+    interval: 30
+    allowUiUpdates: false
+    deleteInvalid: true
+
+  # Health check configuration
+  healthCheck:
+    enabled: true
+    interval: 30
+    timeout: 10
+    retries: 3
+
+  # Metrics configuration
+  metrics:
+    # JVM and Virtual Thread metrics
+    jvmMetrics:
+      enabled: true
+      path: "/actuator/prometheus"
+      interval: "10s"
+      virtualThreads:
+        enabled: true
+        metrics:
+          - jvm_threads_virtual_count
+          - jvm_threads_virtual_daemon_count
+          - jvm_threads_virtual_peak_count
+
+    # Application performance metrics
+    applicationMetrics:
+      enabled: true
+      path: "/actuator/metrics"
+      interval: "10s"
+      endpoints:
+        - http.server.requests
+        - system.cpu.usage
+        - process.cpu.usage
+        - jvm.memory.used
+        - jvm.gc.pause
+        - hikaricp.connections
+
+    # Health check metrics
+    healthMetrics:
+      enabled: true
+      path: "/actuator/health"
+      interval: "30s"
+      components:
+        - db
+        - diskSpace
+        - ping
+        - livenessState
+        - readinessState
+
+# Dashboard search configuration
+search:
+  # Enable recursive dashboard search
+  recursive: true
+  # Hide folders without matching dashboards
+  hideEmptyFolders: true
+
+# Folder configuration
+folders:
+  # Application monitoring folder
+  - name: "Application Monitoring"
+    uid: "app-monitoring"
+    # Dashboard assignments
+    dashboards:
+      - "application-metrics"
+      - "jvm-metrics"
