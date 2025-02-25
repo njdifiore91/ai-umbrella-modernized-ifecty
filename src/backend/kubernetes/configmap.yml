@@ -1,0 +1,80 @@
+spring:
+  application:
+    name: umbrella
+  
+  # Configure Virtual Thread executor for Java 21
+  main:
+    thread-executor: virtual
+
+  # MVC Configuration
+  mvc:
+    servlet:
+      path: /api
+
+  # Server Configuration with Embedded Tomcat 10.1.18
+  server:
+    tomcat:
+      threads:
+        max: 200
+      max-connections: 8192
+      accept-count: 100
+      connection-timeout: 20000
+    port: 8080
+    servlet:
+      context-path: /api
+
+  # Spring Boot Actuator Management Configuration
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,metrics,prometheus,env,loggers
+    endpoint:
+      health:
+        probes:
+          enabled: true
+        show-details: always
+        group:
+          readiness:
+            include: db,integration
+    metrics:
+      tags:
+        application: umbrella
+        environment: ${ENVIRONMENT}
+
+  # External Service Integration Configuration
+  integration:
+    policystar:
+      url: ${POLICYSTAR_URL}
+      connect-timeout: 5000
+      read-timeout: 30000
+      retry:
+        max-attempts: 3
+        backoff:
+          initial: 1000
+    rmv:
+      url: ${RMV_URL}
+      connect-timeout: 5000
+      read-timeout: 20000
+    speedpay:
+      url: ${SPEEDPAY_URL}
+      connect-timeout: 5000
+      read-timeout: 30000
+    clue:
+      url: ${CLUE_URL}
+      connect-timeout: 5000
+      read-timeout: 20000
+
+  # Logging Configuration with ECS Layout
+  logging:
+    pattern:
+      console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId},%X{spanId}] %-5level %logger{36} - %msg%n"
+    file:
+      name: /var/log/umbrella/application.log
+      max-size: 100MB
+      max-history: 10
+    level:
+      root: INFO
+      com.prcins.umbrella: INFO
+      org.springframework.web: INFO
+      org.springframework.security: INFO
