@@ -1,0 +1,155 @@
+# QA Environment Configuration for Umbrella Insurance Application
+# Spring Boot 3.2.1 with embedded Tomcat 10.1.18 and Java 21 Virtual Threads support
+
+spring:
+  application:
+    name: umbrella-insurance-qa
+    environment: qa
+
+  # Enable Virtual Threads for improved performance testing in QA
+  threads:
+    virtual:
+      enabled: true
+
+  # QA database configurations with HikariCP
+  datasource:
+    primary:
+      url: jdbc:sqlserver://qa-sqlserver:1433;databaseName=UMBRELLA_QA
+      username: ${DB_USER}
+      password: ${DB_PASSWORD}
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      type: com.zaxxer.hikari.HikariDataSource
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 300000
+        connection-timeout: 20000
+        pool-name: QAPrimaryHikariPool
+    secondary:
+      url: jdbc:db2://qa-db2:50000/UMBRELLA_QA
+      username: ${DB2_USER}
+      password: ${DB2_PASSWORD}
+      driver-class-name: com.ibm.db2.jcc.DB2Driver
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 300000
+        connection-timeout: 20000
+        pool-name: QASecondaryHikariPool
+
+  # JPA configuration for QA environment
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        generate_statistics: true
+        jdbc:
+          batch_size: 25
+          time_zone: UTC
+
+  # Cache configuration
+  cache:
+    type: ehcache
+    ehcache:
+      config: classpath:ehcache-qa.xml
+
+# Server configuration for QA environment
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      max: 100
+      min-spare: 10
+    accesslog:
+      enabled: true
+      directory: /var/log/umbrella/tomcat
+    mbeanregistry:
+      enabled: true
+
+# Monitoring configuration for QA environment
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include:
+          - health
+          - metrics
+          - prometheus
+          - loggers
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - db
+            - diskSpace
+  metrics:
+    tags:
+      environment: qa
+      application: umbrella-insurance-qa
+    enable:
+      jvm: true
+      process: true
+      system: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.prcins.umbrella: DEBUG
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/umbrella/application-qa.log
+    max-size: 100MB
+    max-history: 30
+
+# Integration endpoints for QA environment
+integration:
+  policystar:
+    url: https://qa-policystar.prcins.net/services
+    timeout: 30000
+    retry:
+      max-attempts: 3
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 10000
+  rmv:
+    url: https://qa-rmv.prcins.net/services
+    timeout: 20000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
+  speedpay:
+    url: https://qa-speedpay.prcins.net/api
+    timeout: 15000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
+  clue:
+    url: https://qa-clue.prcins.net/property
+    timeout: 25000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
