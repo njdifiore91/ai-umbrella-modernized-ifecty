@@ -1,0 +1,128 @@
+apiVersion: cluster-autoscaler/v1
+kind: ClusterAutoscaler
+metadata:
+  name: umbrella-cluster-autoscaler
+  namespace: kube-system
+  labels:
+    app: cluster-autoscaler
+    environment: production
+  annotations:
+    kubernetes.io/description: "Cluster Autoscaler for Spring Boot 3.2.x with Virtual Thread optimization"
+
+spec:
+  # Core scaling configuration
+  scaleDown:
+    enabled: true
+    # Conservative scale down settings to prevent disruption
+    delayAfterAdd: "10m"
+    delayAfterDelete: "10m"
+    delayAfterFailure: "3m"
+    unneededTime: "10m"
+    # Spring Boot-aware scale down thresholds
+    utilization:
+      cpuThreshold: "0.4"
+      memoryThreshold: "0.5"
+      actuatorMetricThreshold: "0.6"
+
+  # Node group configuration optimized for Spring Boot workloads
+  nodeGroups:
+    - name: umbrella-node-group-standard
+      minSize: 3
+      maxSize: 10
+      machineType: "t3.xlarge"
+      labels:
+        virtual-thread-optimized: "true"
+        spring-boot-version: "3.2.x"
+        node-purpose: "application"
+      taints: []
+      
+    - name: umbrella-node-group-memory
+      minSize: 2
+      maxSize: 8
+      machineType: "r6g.2xlarge"
+      labels:
+        virtual-thread-optimized: "true"
+        spring-boot-version: "3.2.x"
+        node-purpose: "memory-intensive"
+      taints: []
+
+  # Resource limits for the entire cluster
+  resourceLimits:
+    maxNodesTotal: 20
+    cores:
+      min: 8
+      max: 64
+    memory:
+      min: "16Gi"
+      max: "128Gi"
+
+  # Spring Boot optimization settings
+  springBootOptimization:
+    enabled: true
+    actuatorMetricsEndpoint: "/actuator/metrics"
+    healthCheckEndpoint: "/actuator/health"
+    virtualThreadMetrics:
+      enabled: true
+      threshold: 75
+      metricName: "jvm.threads.virtual.active"
+
+  # Scaling thresholds optimized for Virtual Thread workloads
+  scaleUpThresholds:
+    cpuUtilization: 70
+    memoryUtilization: 80
+    virtualThreadUtilization: 75
+    actuatorMetrics:
+      - name: "http_server_requests_seconds_max"
+        threshold: 2.0
+      - name: "jvm_threads_live_threads"
+        threshold: 100
+      - name: "system_cpu_usage"
+        threshold: 0.75
+
+  # Autoscaler behavior configuration
+  scanInterval: "10s"
+  skipNodesWithSystemPods: true
+  skipNodesWithLocalStorage: true
+  balanceSimilarNodeGroups: true
+  expander: "least-waste"
+
+  # Integration with HPA and VPA
+  podAutoscalerIntegration:
+    enabled: true
+    hpaReference:
+      name: "umbrella-backend-hpa"
+      namespace: "umbrella"
+    vpaReference:
+      name: "umbrella-backend-vpa"
+      namespace: "umbrella"
+
+  # Optimization settings
+  optimizations:
+    scaleDownUnneededTime: "10m"
+    scaleDownUtilizationThreshold: 0.5
+    maxGracefulTerminationSec: 600
+    maxNodeProvisionTime: "15m"
+    maxPodEvictionTime: "2m"
+
+  # Cloud provider specific settings
+  cloudProvider:
+    maxNodeProvisionTime: "15m"
+    maxPodEvictionTime: "2m"
+    nodeGroups:
+      autoDiscovery:
+        enabled: true
+        labels:
+          - virtual-thread-optimized
+          - spring-boot-version
+
+  # Monitoring and metrics configuration
+  monitoring:
+    writeStatusConfigMap: true
+    statusConfigMapName: "cluster-autoscaler-status"
+    podMonitor:
+      enabled: true
+      interval: "30s"
+    metrics:
+      enabled: true
+      prometheusRules:
+        enabled: true
