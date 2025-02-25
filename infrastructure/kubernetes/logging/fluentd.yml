@@ -1,0 +1,244 @@
+# Fluentd DaemonSet configuration for Spring Boot log collection
+# Version: 1.0.0
+# Provides centralized logging infrastructure with enhanced Spring Boot integration
+# and container-aware log aggregation capabilities
+
+---
+# RBAC Configuration for Fluentd
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd
+  namespace: umbrella
+  labels:
+    app: fluentd
+    component: logging
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentd
+  labels:
+    app: fluentd
+    component: logging
+rules:
+- apiGroups: [""]
+  resources:
+    - "pods"
+    - "namespaces"
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluentd
+roleRef:
+  kind: ClusterRole
+  name: fluentd
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: fluentd
+  namespace: umbrella
+
+---
+# Network Policy for Fluentd
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fluentd-network-policy
+  namespace: umbrella
+spec:
+  podSelector:
+    matchLabels:
+      app: fluentd
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: umbrella
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: elastic-system
+        - podSelector:
+            matchLabels:
+              app: elasticsearch
+
+---
+# Fluentd DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: umbrella
+  labels:
+    app: fluentd
+    component: logging
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "24231"
+    spec:
+      serviceAccountName: fluentd
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: fluentd
+        image: fluent/fluentd:v1.16-1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        - name: FLUENT_ELASTICSEARCH_SCHEME
+          value: "http"
+        - name: FLUENTD_SYSTEMD_CONF
+          value: "disable"
+        - name: FLUENT_UID
+          value: "1000"
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: fluentd-config
+          mountPath: /fluentd/etc
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        ports:
+        - containerPort: 24224
+          name: forward
+          protocol: TCP
+        - containerPort: 24231
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 15
+          periodSeconds: 15
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+      volumes:
+      - name: fluentd-config
+        configMap:
+          name: fluentd-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+
+---
+# ConfigMap for Fluentd configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: umbrella
+data:
+  fluent.conf: |
+    # System-wide configurations
+    <system>
+      log_level info
+      workers 4
+    </system>
+
+    # Spring Boot application logs from Kubernetes containers
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      <parse>
+        @type json
+      </parse>
+    </source>
+
+    # Kubernetes metadata enrichment
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+    </filter>
+
+    # Spring Boot specific parsing
+    <filter kubernetes.**>
+      @type parser
+      key_name log
+      <parse>
+        @type regexp
+        expression /^(?<timestamp>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})\s+(?<level>[A-Z]+)\s+(?<pid>\d+)\s+---\s+\[(?<thread>[^\]]+)\]\s+(?<class>[^\s]+)\s+:\s+(?<message>.*)$/
+      </parse>
+    </filter>
+
+    # Output to Elasticsearch
+    <match **>
+      @type elasticsearch
+      host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+      port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+      scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME']}"
+      logstash_format true
+      logstash_prefix umbrella-logs
+      include_tag_key true
+      tag_key @log_name
+      flush_interval 30s
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        total_limit_size 10GB
+        chunk_limit_size 2M
+        flush_interval 5s
+        retry_type exponential_backoff
+        retry_wait 5s
+        max_retry_wait 30s
+        retry_timeout 1h
+      </buffer>
+    </match>
