@@ -1,0 +1,104 @@
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.jar
+*.war
+*.jar.original
+spring-boot-devtools.properties
+
+# Frontend build outputs
+/build/
+/dist/
+/.cache/
+/.next/
+/.nuxt/
+/.gatsby/
+/.parcel-cache/
+/.webpack/
+/coverage/
+/.nyc_output/
+/storybook-static/
+junit.xml
+test-report.xml
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Dependencies
+/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE and Editor files
+/.idea/
+/.vscode/
+/.vs/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+.factorypath
+nbproject/
+nb-configuration.xml
+.metals/
+.bloop/
+*.sublime-*
+*.swp
+*.swo
+.history/
+
+# Environment and configuration files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+application-*.yml
+application-*.properties
+!application-example.yml
+!application-test.yml
+*.jks
+*.p12
+*.der
+*.pem
+secrets.yml
+secrets.properties
+
+# Logs and temporary files
+/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+*.pid
+*.hprof
+hs_err_pid*
+
+# Cache files
+.stylelintcache
+.eslintcache
+
+# System files
+.DS_Store
+Thumbs.db
+*~
+
+# Test coverage and reports
+/coverage/
+.nyc_output/
+junit.xml
+test-report.xml
+
+# Build analysis
+stats.json
