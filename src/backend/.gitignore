@@ -1,0 +1,59 @@
+### Maven ###
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.jar.original
+spring-boot-devtools.properties
+
+### IDE ###
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+.factorypath
+nbproject/
+nb-configuration.xml
+.metals/
+.bloop/
+
+### Compiled Files ###
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.db
+
+### Logs and Temp Files ###
+logs/
+*.log
+*.tmp
+*.temp
+*.pid
+*.hprof
+hs_err_pid*
+
+### Environment Specific ###
+.env
+application-*.yml
+application-*.properties
+!application-example.yml
+!application-test.yml
+*.jks
+*.p12
+*.der
+*.pem
+secrets.yml
+secrets.properties
+
+### OS Specific ###
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
