@@ -1,0 +1,124 @@
+# Default values for ai_umbrella Helm chart
+# This is a YAML-formatted file.
+
+# Override release name
+nameOverride: ""
+fullnameOverride: ""
+
+# Backend service configuration
+backend:
+  image:
+    repository: harbor.prcins.net/umbrella/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  # Spring Boot profile configuration
+  springProfiles: default
+  
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 750m
+      memory: 1.5Gi
+    limits:
+      cpu: 1500m
+      memory: 3Gi
+  
+  # JVM and container configuration
+  env:
+    JAVA_OPTS: "-XX:+UseZGC -XX:+ZGenerational -Xmx2048m"
+  
+  # Horizontal Pod Autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  
+  # Health check probes using Spring Boot Actuator endpoints
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: http
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 20
+
+# Web frontend configuration
+web:
+  image:
+    repository: harbor.prcins.net/umbrella/web
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 750m
+      memory: 1Gi
+  
+  # Horizontal Pod Autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+  
+  # Health check probe
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 20
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: umbrella.prcins.net
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Monitoring configuration
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /actuator/prometheus
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: HighCPUUsage
+        expr: container_cpu_usage_seconds_total{container=~"umbrella-.*"} > 0.8
+        for: 5m
+        severity: warning
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container=~"umbrella-.*"} > 0.8
+        for: 5m
+        severity: warning
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: standard
+  size: 20Gi
