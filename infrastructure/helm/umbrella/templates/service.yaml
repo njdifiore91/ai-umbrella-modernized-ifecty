@@ -1,0 +1,65 @@
+{{- /*
+Service template for umbrella application with Spring Boot 3.2.x and embedded Tomcat 10.1.18 support
+*/}}
+
+{{- /*
+Backend service with Spring Boot Actuator endpoints
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "umbrella.fullname" . }}-backend
+  labels:
+    {{- include "umbrella.labels" . | nindent 4 }}
+  annotations:
+    # Enable Prometheus scraping for Spring Boot Actuator metrics
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/port: "8081"
+    # Service discovery annotations
+    service.kubernetes.io/topology-aware-hints: "auto"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # Spring Boot specific annotations
+    spring-boot.version: "3.2.x"
+    spring-boot.tomcat.version: "10.1.18"
+    spring-boot.java.version: "21"
+    spring-boot.virtual-threads.enabled: "true"
+spec:
+  type: ClusterIP
+  ports:
+    # Main application port
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+    # Spring Boot Actuator management port
+    - port: 8081
+      targetPort: management
+      protocol: TCP
+      name: management
+  selector:
+    {{- include "umbrella.selectorLabels" . | nindent 4 }}
+---
+{{- /*
+Web frontend service
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "umbrella.fullname" . }}-web
+  labels:
+    {{- include "umbrella.labels" . | nindent 4 }}
+  annotations:
+    # Service discovery annotations
+    service.kubernetes.io/topology-aware-hints: "auto"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: ClusterIP
+  ports:
+    # Web frontend port
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "umbrella.selectorLabels" . | nindent 4 }}
