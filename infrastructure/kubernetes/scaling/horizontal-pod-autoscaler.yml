@@ -1,0 +1,115 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: umbrella-backend-hpa
+  namespace: umbrella
+  labels:
+    app: umbrella-backend
+    tier: backend
+  annotations:
+    kubernetes.io/description: "HPA for Spring Boot 3.2.x backend with Virtual Thread optimization"
+    autoscaling.alpha.kubernetes.io/metrics-stability: "stable"
+    autoscaling.alpha.kubernetes.io/behavior: |
+      {
+        "scaleUp": {
+          "stabilizationWindowSeconds": 60,
+          "selectPolicy": "Max",
+          "policies": [
+            {
+              "type": "Pods",
+              "value": 2,
+              "periodSeconds": 60
+            }
+          ]
+        },
+        "scaleDown": {
+          "stabilizationWindowSeconds": 300,
+          "selectPolicy": "Min",
+          "policies": [
+            {
+              "type": "Pods",
+              "value": 1,
+              "periodSeconds": 120
+            }
+          ]
+        }
+      }
+
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: umbrella-backend
+  minReplicas: 2
+  maxReplicas: 10
+
+  metrics:
+    # CPU-based scaling optimized for Virtual Threads
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+    # Spring Boot Actuator HTTP request duration metric
+    - type: Pods
+      pods:
+        metric:
+          name: actuator_http_server_requests_seconds_max
+        target:
+          type: AverageValue
+          averageValue: "2"
+
+    # Spring Boot Actuator thread pool utilization metric
+    - type: Pods
+      pods:
+        metric:
+          name: jvm_threads_live_threads
+        target:
+          type: AverageValue
+          averageValue: "100"
+
+    # Spring Boot Actuator HTTP request rate metric
+    - type: Object
+      object:
+        metric:
+          name: http_server_requests_per_second
+        describedObject:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: umbrella-backend
+        target:
+          type: Value
+          value: "50"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      selectPolicy: Max
+
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      selectPolicy: Min
