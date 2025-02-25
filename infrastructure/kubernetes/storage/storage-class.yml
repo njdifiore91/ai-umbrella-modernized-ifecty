@@ -1,0 +1,97 @@
+# StorageClass definitions for ai_umbrella application
+# Provides optimized storage configurations for databases, backups, and persistent data
+# Version: 1.0.0
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: umbrella-db-storage
+  labels:
+    app: umbrella
+    component: storage
+    environment: ${ENV}
+    managed-by: kubernetes
+    encryption: enabled
+  annotations:
+    description: "High-performance storage class for database persistence"
+    storageclass.kubernetes.io/is-default-class: "false"
+spec:
+  provisioner: kubernetes.io/aws-ebs
+  volumeBindingMode: WaitForFirstConsumer
+  reclaimPolicy: Retain
+  allowVolumeExpansion: true
+  parameters:
+    type: gp3
+    iopsPerGB: "3000"
+    encrypted: "true"
+    kmsKeyId: ${KMS_KEY_ID}
+    fsType: ext4
+    throughput: "1000"
+  mountOptions:
+    - noatime
+    - nodiratime
+    - nobarrier
+    - data=ordered
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: umbrella-backup-storage
+  labels:
+    app: umbrella
+    component: storage
+    environment: ${ENV}
+    managed-by: kubernetes
+    encryption: enabled
+  annotations:
+    description: "Cost-effective storage class for backup and archive data"
+    storageclass.kubernetes.io/is-default-class: "false"
+spec:
+  provisioner: kubernetes.io/aws-ebs
+  volumeBindingMode: WaitForFirstConsumer
+  reclaimPolicy: Retain
+  allowVolumeExpansion: true
+  parameters:
+    type: st1
+    encrypted: "true"
+    kmsKeyId: ${KMS_KEY_ID}
+    fsType: ext4
+    throughput: "500"
+  mountOptions:
+    - noatime
+    - nodiratime
+    - nobarrier
+    - data=ordered
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: umbrella-cache-storage
+  labels:
+    app: umbrella
+    component: storage
+    environment: ${ENV}
+    managed-by: kubernetes
+    encryption: enabled
+  annotations:
+    description: "High-performance storage class for caching and temporary data"
+    storageclass.kubernetes.io/is-default-class: "false"
+spec:
+  provisioner: kubernetes.io/aws-ebs
+  volumeBindingMode: WaitForFirstConsumer
+  reclaimPolicy: Delete
+  allowVolumeExpansion: true
+  parameters:
+    type: gp3
+    iopsPerGB: "4000"
+    encrypted: "true"
+    kmsKeyId: ${KMS_KEY_ID}
+    fsType: ext4
+    throughput: "1000"
+  mountOptions:
+    - noatime
+    - nodiratime
+    - nobarrier
+    - data=writeback
