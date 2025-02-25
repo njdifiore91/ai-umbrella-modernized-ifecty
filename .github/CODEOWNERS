@@ -1,0 +1,68 @@
+# Global repository administrators
+* @umbrella-admins
+
+# Backend Java application with Java 21 and Spring Boot 3.2.x components
+/src/backend/ @backend-team @architects
+/src/backend/src/main/java/com/prcins/umbrella/config/ @backend-team @architects
+/src/backend/src/main/java/jakarta/ @backend-team @architects
+
+# Spring Boot Actuator and monitoring components
+/src/backend/src/main/java/com/prcins/umbrella/actuator/ @backend-team @devops-team
+
+# Frontend web application
+/src/web/ @frontend-team @architects
+
+# Infrastructure and container orchestration
+/infrastructure/ @devops-team @architects
+/infrastructure/kubernetes/ @devops-team @architects
+/infrastructure/helm/ @devops-team @architects
+
+# Security implementation including Jakarta Security
+/src/backend/src/main/java/com/prcins/umbrella/security/ @security-team @architects
+
+# External system integration with Spring Boot 3.2.x
+/src/backend/src/main/java/com/prcins/umbrella/integration/ @integration-team @architects
+
+# Configuration files
+*.yml @devops-team
+*.yaml @devops-team
+*.properties @devops-team
+
+# Container and deployment configuration
+Dockerfile @devops-team @security-team
+docker-compose*.yml @devops-team
+.dockerignore @devops-team
+
+# CI/CD workflows
+.github/workflows/ @devops-team @ci-admins
+
+# Build configuration
+pom.xml @backend-team @architects
+package.json @frontend-team @architects
+package-lock.json @frontend-team @architects
+
+# Documentation
+*.md @umbrella-admins @architects
+
+# Test configurations
+/src/test/ @backend-team @qa-team
+/src/backend/src/test/ @backend-team @qa-team
+/src/web/test/ @frontend-team @qa-team
+
+# Database migrations and scripts
+/src/backend/src/main/resources/db/ @backend-team @dba-team
+
+# API specifications
+/src/backend/src/main/resources/api/ @backend-team @architects @integration-team
+
+# Monitoring and observability
+/src/backend/src/main/resources/monitoring/ @backend-team @devops-team
+/infrastructure/monitoring/ @devops-team
+
+# Environment configurations
+/src/backend/src/main/resources/config/ @devops-team @architects
+/infrastructure/environments/ @devops-team @architects
+
+# Security configurations
+/src/backend/src/main/resources/security/ @security-team @architects
+/infrastructure/security/ @security-team @devops-team
