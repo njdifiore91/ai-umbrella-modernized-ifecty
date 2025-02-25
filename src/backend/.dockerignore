@@ -1,0 +1,77 @@
+target/
+!target/*.jar
+
+# Version control
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Binary files
+bin/
+
+# Logs and environment files
+*.log
+.env*
+
+# Test files
+src/test/
+
+# Kubernetes deployment files
+kubernetes/
+
+# Maven wrapper
+!.mvn/wrapper/maven-wrapper.jar
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Node modules (if any frontend build process)
+node_modules/
+
+# Local development files
+*.local
+*.dev
+
+# Cache directories
+.cache/
+.m2/
+.gradle/
+
+# Debug files
+*.debug
+
+# Backup files
+*.bak
+*~
+
+# Security and sensitive files
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# Build configuration (except essential files)
+.dockerignore
+!Dockerfile
+!pom.xml
+
+# Profiling and monitoring files
+*.hprof
+*.jfr
+
+# Dependency lock files
+dependency-reduced-pom.xml
