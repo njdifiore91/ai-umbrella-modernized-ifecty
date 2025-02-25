@@ -1,0 +1,77 @@
+# Cluster Configuration
+cluster.name: umbrella-elasticsearch
+node.name: ${HOSTNAME}
+network.host: 0.0.0.0
+http.port: 9200
+
+# Cluster Settings
+discovery.type: single-node
+discovery.seed_hosts: ["elasticsearch"]
+cluster.initial_master_nodes: ["elasticsearch"]
+cluster.routing.allocation.disk.threshold_enabled: true
+cluster.routing.allocation.disk.watermark.low: "85%"
+cluster.routing.allocation.disk.watermark.high: "90%"
+cluster.routing.allocation.awareness.attributes: kubernetes.io/hostname
+cluster.routing.allocation.node_concurrent_recoveries: 2
+cluster.routing.rebalance.enable: all
+
+# Node Configuration
+node.master: true
+node.data: true
+node.ingest: true
+node.ml: false
+node.remote_cluster_client: false
+node.attr.kubernetes_node: ${KUBERNETES_NODE_NAME}
+node.attr.zone: ${KUBERNETES_ZONE}
+
+# Path Configuration
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+path.repo: /usr/share/elasticsearch/snapshots
+
+# Memory Settings
+bootstrap.memory_lock: true
+indices.memory.index_buffer_size: "15%"
+indices.queries.cache.size: "10%"
+indices.fielddata.cache.size: "15%"
+indices.breaker.total.use_real_memory: true
+indices.breaker.fielddata.limit: "60%"
+indices.breaker.request.limit: "40%"
+
+# Network Configuration
+transport.tcp.port: 9300
+transport.tcp.compress: true
+http.max_content_length: 200mb
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+http.cors.allow-methods: "OPTIONS, HEAD, GET, POST, PUT, DELETE"
+http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length, Authorization"
+
+# Security Configuration
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.keystore.path: ${ELASTICSEARCH_SSL_KEYSTORE_PATH}
+xpack.security.audit.enabled: true
+xpack.security.audit.logfile.events.include: access_denied, authentication_failed, connection_denied
+xpack.monitoring.collection.enabled: true
+xpack.monitoring.collection.interval: 30s
+
+# Index Configuration
+action.auto_create_index: .monitoring-*,.watches,.triggered_watches,.watcher-history-*,spring-boot-*,ecs-logs-*
+action.destructive_requires_name: true
+indices.lifecycle.poll_interval: 10m
+indices.recovery.max_bytes_per_sec: 40mb
+indices.lifecycle.history_index_enabled: true
+indices.lifecycle.history_max_age: 7d
+indices.default_pipeline: ecs-pipeline
+
+# Thread Pool Configuration
+thread_pool.write.size: 32
+thread_pool.write.queue_size: 1000
+thread_pool.search.size: 16
+thread_pool.search.queue_size: 1000
+thread_pool.get.size: 8
+thread_pool.get.queue_size: 1000
+thread_pool.bulk.size: 16
+thread_pool.bulk.queue_size: 500
