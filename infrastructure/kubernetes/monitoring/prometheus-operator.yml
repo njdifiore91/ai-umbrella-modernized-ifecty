@@ -1,0 +1,186 @@
+---
+# Prometheus Operator CRDs
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prometheuses.monitoring.coreos.com
+  labels:
+    app.kubernetes.io/name: prometheus-operator
+    app.kubernetes.io/version: "0.69.1"
+spec:
+  group: monitoring.coreos.com
+  names:
+    kind: Prometheus
+    plural: prometheuses
+    singular: prometheus
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+
+---
+# Prometheus Operator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-operator
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-operator
+    app.kubernetes.io/version: "0.69.1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus-operator
+    spec:
+      serviceAccountName: prometheus-operator
+      containers:
+        - name: prometheus-operator
+          image: quay.io/prometheus-operator/prometheus-operator:v0.69.1
+          args:
+            - --prometheus-config-reloader=quay.io/prometheus-operator/prometheus-config-reloader:v0.69.1
+            - --config-reloader-cpu=200m
+            - --config-reloader-memory=50Mi
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+
+---
+# ServiceMonitor for Spring Boot Actuator Endpoints
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: spring-boot-actuator
+  namespace: monitoring
+  labels:
+    app: umbrella-backend
+spec:
+  selector:
+    matchLabels:
+      app: umbrella-backend
+  endpoints:
+    # Prometheus metrics endpoint
+    - port: http
+      path: /actuator/prometheus
+      interval: 10s
+      metricRelabelings:
+        # Capture Virtual Thread metrics
+        - sourceLabels: [__name__]
+          regex: 'jvm_threads_virtual.*'
+          action: keep
+        # Spring Boot 3.2.x metrics
+        - sourceLabels: [__name__]
+          regex: 'spring_.*'
+          action: keep
+        # JVM metrics
+        - sourceLabels: [__name__]
+          regex: 'jvm_.*'
+          action: keep
+    # Health check endpoint
+    - port: http
+      path: /actuator/health
+      interval: 30s
+
+---
+# Prometheus Instance Configuration
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: umbrella-prometheus
+  namespace: monitoring
+spec:
+  version: "2.45.0"
+  serviceMonitorSelector:
+    matchLabels:
+      app: umbrella-backend
+  serviceAccountName: prometheus
+  podMonitorSelector: {}
+  resources:
+    requests:
+      memory: "400Mi"
+      cpu: "200m"
+    limits:
+      memory: "800Mi"
+      cpu: "500m"
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+  retention: 15d
+  scrapeInterval: 10s
+  evaluationInterval: 10s
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager
+        port: http
+  additionalScrapeConfigs:
+    name: additional-scrape-configs
+    key: prometheus-additional.yaml
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  ruleSelector:
+    matchLabels:
+      app: umbrella-backend
+  rules:
+    - name: umbrella-alerts
+      groups:
+        # Response Time Alerts
+        - name: response-time
+          rules:
+            - alert: HighResponseTime
+              expr: http_server_requests_seconds_max > 2
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: High response time detected
+                description: Response time exceeds 2 seconds
+        # Virtual Thread Alerts
+        - name: virtual-threads
+          rules:
+            - alert: VirtualThreadStarvation
+              expr: jvm_threads_virtual_count > 1000
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: High virtual thread count
+                description: Virtual thread count exceeds threshold
+        # Spring Boot Health Alerts
+        - name: spring-boot-health
+          rules:
+            - alert: HealthCheckFailing
+              expr: spring_boot_actuator_health_check_status == 0
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: Health check failing
+                description: Spring Boot health check is failing
