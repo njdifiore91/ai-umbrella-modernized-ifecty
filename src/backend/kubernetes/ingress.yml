@@ -1,0 +1,74 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: umbrella-backend-ingress
+  namespace: umbrella
+  labels:
+    app: umbrella-backend
+    tier: backend
+    component: ingress
+    managed-by: kubernetes
+  annotations:
+    # Ingress Class Configuration
+    kubernetes.io/ingress.class: nginx
+    
+    # SSL/TLS Security Settings
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"
+    
+    # Proxy Configuration Settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "8m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    
+    # Load Balancing Settings
+    nginx.ingress.kubernetes.io/load-balance: "least_conn"
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "32"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "60"
+    
+    # Rate Limiting Settings
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    
+    # Logging Configuration
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
+    
+    # Security Headers and Proxy Configuration
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-Host $host;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+
+spec:
+  tls:
+    - hosts:
+        - api.umbrella.prcins.net
+      secretName: umbrella-tls-secret
+  rules:
+    - host: api.umbrella.prcins.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: umbrella-backend-service
+                port:
+                  name: http
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service:
+                name: umbrella-backend-service
+                port:
+                  name: actuator
