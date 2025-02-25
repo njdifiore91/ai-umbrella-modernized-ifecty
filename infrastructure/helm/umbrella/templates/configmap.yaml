@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "umbrella.fullname" . }}-config
+  labels:
+    {{- include "umbrella.labels" . | nindent 4 }}
+data:
+  # Spring Boot 3.2.x application configuration with Virtual Threads support
+  application.yml: |
+    spring:
+      application:
+        name: umbrella-insurance
+      # Enable Virtual Threads for improved concurrency
+      threads:
+        virtual:
+          enabled: true
+      # Optimize startup time
+      main:
+        lazy-initialization: false
+      # Database configuration with HikariCP
+      datasource:
+        type: com.zaxxer.hikari.HikariDataSource
+        hikari:
+          pool-name: HikariPool
+          auto-commit: true
+          maximum-pool-size: {{ .Values.backend.resources.limits.memory | default "1Gi" | quote }}
+          minimum-idle: {{ .Values.backend.resources.requests.memory | default "512Mi" | quote }}
+          connection-timeout: 30000
+          idle-timeout: 600000
+          max-lifetime: 1800000
+      # Disable JPA open-in-view for better performance
+      jpa:
+        open-in-view: false
+        properties:
+          hibernate:
+            jdbc.batch_size: 50
+            order_inserts: true
+            order_updates: true
+
+    # Actuator configuration for monitoring
+    management:
+      endpoints:
+        web:
+          base-path: /actuator
+          exposure:
+            include: ["health", "metrics", "prometheus", "info", "env", "loggers"]
+      endpoint:
+        health:
+          probes:
+            enabled: true
+          show-details: always
+          group:
+            readiness:
+              include: ["db", "diskSpace", "ping"]
+      metrics:
+        tags:
+          application: {{ .Values.backend.image.repository | default "umbrella-backend" | quote }}
+        export:
+          prometheus:
+            enabled: true
+
+    # Logging configuration
+    logging:
+      pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+      level:
+        root: INFO
+        com.prcins.umbrella: ${LOG_LEVEL:INFO}
+        org.springframework.web: INFO
+        org.hibernate: INFO
+
+  # Logback configuration for structured logging
+  logback-spring.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <configuration>
+      <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+          <includeMdcKeyName>traceId</includeMdcKeyName>
+          <includeMdcKeyName>spanId</includeMdcKeyName>
+          <includeMdcKeyName>userId</includeMdcKeyName>
+          <includeMdcKeyName>sessionId</includeMdcKeyName>
+          <customFields>{"app":"umbrella","version":"{{ .Chart.AppVersion }}","environment":"{{ .Values.backend.springProfiles }}"}</customFields>
+        </encoder>
+      </appender>
+
+      <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+      </root>
+    </configuration>
+
+  # Web server configuration for embedded Tomcat 10.1.18
+  server.yml: |
+    server:
+      tomcat:
+        threads:
+          max: 200
+          min-spare: 10
+        max-connections: 8192
+        accept-count: 100
+        connection-timeout: 20000
+      compression:
+        enabled: true
+        mime-types: application/json,application/xml,text/html,text/plain
+        min-response-size: 2048
+
+  # Environment-specific configuration
+  env.properties: |
+    APP_NAME=umbrella-insurance
+    SPRING_PROFILES_ACTIVE={{ .Values.backend.springProfiles }}
+    JAVA_OPTS=-XX:+UseZGC -XX:+ZGenerational -Xmx{{ .Values.backend.resources.limits.memory }}
+    MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED=true
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,prometheus,info,env,loggers
+    SPRING_THREADS_VIRTUAL_ENABLED=true
+
+  # Web frontend configuration
+  nginx.conf: |
+    server {
+      listen 80;
+      server_name localhost;
+      
+      location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+      }
+
+      location /api {
+        proxy_pass http://{{ template "umbrella.fullname" . }}-backend:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+
+      location /actuator {
+        proxy_pass http://{{ template "umbrella.fullname" . }}-backend:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+      }
+    }
+
+  # Frontend environment configuration
+  environment.js: |
+    window.ENV = {
+      API_URL: '/api',
+      APP_VERSION: '{{ .Chart.AppVersion }}',
+      ENVIRONMENT: '{{ .Values.backend.springProfiles }}',
+      ACTUATOR_PATH: '/actuator'
+    };
