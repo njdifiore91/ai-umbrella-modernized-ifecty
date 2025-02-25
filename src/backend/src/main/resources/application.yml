@@ -1,0 +1,100 @@
+# Spring Boot 3.2.1 Base Configuration
+# Provides core settings for the Umbrella Insurance application with embedded Tomcat 10.1.18
+
+spring:
+  application:
+    name: umbrella-insurance
+    description: Enterprise Insurance Management System
+  
+  # Core application settings
+  main:
+    allow-bean-definition-overriding: true
+    lazy-initialization: false
+  
+  # Enable Virtual Threads for improved concurrency (Java 21 feature)
+  threads:
+    virtual:
+      enabled: true
+
+  # Primary datasource configuration with HikariCP
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      pool-name: HikariPool
+      auto-commit: true
+      # Connection pool optimizations
+      data-source-properties:
+        cachePrepStmts: true
+        prepStmtCacheSize: 250
+        prepStmtCacheSqlLimit: 2048
+        useServerPrepStmts: true
+
+  # JPA/Hibernate configuration with Jakarta Persistence
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 25
+        generate_statistics: false
+
+# Embedded Tomcat 10.1.18 server configuration
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    # Enable JMX monitoring
+    mbeanregistry:
+      enabled: true
+    # Thread pool configuration
+    threads:
+      max: 200
+      min-spare: 10
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# Monitoring and observability configuration
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include:
+          - health
+          - metrics
+          - prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - db
+            - diskSpace
+  metrics:
+    enable:
+      jvm: true
+      process: true
+      system: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Logging configuration
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.prcins.umbrella: ${LOG_LEVEL:INFO}
+    org.springframework: INFO
+
+---
+# Profile-specific configuration placeholder
+# Extended by application-{profile}.yml files
+spring:
+  config:
+    activate:
+      on-profile: default
