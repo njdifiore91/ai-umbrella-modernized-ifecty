@@ -1,0 +1,143 @@
+name: Build and Test
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+    paths:
+      - src/backend/**
+      - src/web/**
+      - .github/workflows/build.yml
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - src/backend/**
+      - src/web/**
+      - .github/workflows/build.yml
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '18.x'
+  MAVEN_OPTS: '-Xmx3072m'
+  NODE_OPTIONS: '--max-old-space-size=4096'
+  SONAR_HOST: 'https://sonar.prcins.net'
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Build Backend
+        working-directory: src/backend
+        run: mvn clean verify -B -Dspring-boot.run.jvmArguments="-XX:+UseZGC" -Djava.security.egd=file:/dev/./urandom jacoco:report
+
+      - name: Build Frontend
+        working-directory: src/web
+        run: |
+          npm ci
+          npm run lint
+          npm run test:coverage
+          npm run build:prod
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            src/backend/target/surefire-reports/
+            src/web/coverage/
+
+  quality:
+    name: Quality Analysis
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Test Results
+        uses: actions/download-artifact@v3
+        with:
+          name: test-results
+
+      - name: SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar -B \
+          -Dsonar.host.url=${{ env.SONAR_HOST }} \
+          -Dsonar.login=${{ env.SONAR_TOKEN }} \
+          -Dsonar.java.version=${{ env.JAVA_VERSION }} \
+          -Dsonar.coverage.jacoco.xmlReportPaths=src/backend/target/site/jacoco/jacoco.xml \
+          -Dsonar.javascript.lcov.reportPaths=src/web/coverage/lcov.info \
+          -Dsonar.qualitygate.wait=true
+
+      - name: Quality Gate Check
+        if: failure()
+        run: |
+          echo "Quality Gate failed. Please check SonarQube report at ${{ env.SONAR_HOST }}" && exit 1
+
+  container:
+    name: Container Build
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Container
+        working-directory: src/backend
+        run: |
+          docker build \
+          --build-arg JAVA_VERSION=${{ env.JAVA_VERSION }} \
+          --build-arg SPRING_PROFILES_ACTIVE=container \
+          -t umbrella-backend:${{ github.sha }} \
+          -f Dockerfile .
+
+      - name: Validate Container
+        run: |
+          docker run --rm umbrella-backend:${{ github.sha }} java -XX:+PrintFlagsFinal -version | grep UseZGC && \
+          docker run --rm umbrella-backend:${{ github.sha }} curl -f http://localhost:8080/actuator/health || exit 1
