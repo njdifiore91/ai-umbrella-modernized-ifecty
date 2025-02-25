@@ -1,0 +1,96 @@
+apiVersion: 1
+
+# Datasource provisioning configuration for ai_umbrella application
+# Grafana version: 10.2.0
+# Prometheus version: 2.45.0
+
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus-server:9090
+    isDefault: true
+    version: 1
+    editable: false
+    jsonData:
+      timeInterval: "10s"
+      httpMethod: "POST"
+      manageAlerts: true
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.45.0"
+      # Enable exemplar support for trace correlation
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+      # Spring Boot Actuator metrics configuration
+      customQueryParameters: 
+        - name: timeout
+          value: "60s"
+      # Virtual Thread monitoring metrics
+      timeSeriesQuery:
+        - name: "Virtual Thread Count"
+          expr: "jvm_threads_virtual_count"
+        - name: "Virtual Thread Daemon Count"  
+          expr: "jvm_threads_virtual_daemon_count"
+        - name: "Virtual Thread Peak Count"
+          expr: "jvm_threads_virtual_peak_count"
+
+    secureJsonData:
+      httpHeaderValue1: "Bearer ${PROMETHEUS_API_TOKEN}"
+
+# Provisioning settings
+provisioning:
+  autoUpdate: true
+  updateIntervalSeconds: 30
+  allowUiUpdates: false
+  deleteInvalid: true
+
+# Health check configuration
+healthCheck:
+  enabled: true
+  intervalSeconds: 30
+  timeoutSeconds: 10
+  retries: 3
+
+# Metrics scraping configuration
+metrics:
+  # JVM and Virtual Thread metrics
+  jvmMetrics:
+    enabled: true
+    path: "/actuator/prometheus"
+    interval: "10s"
+    virtualThreads:
+      enabled: true
+      metrics:
+        - jvm_threads_virtual_count
+        - jvm_threads_virtual_daemon_count
+        - jvm_threads_virtual_peak_count
+
+  # Application performance metrics  
+  applicationMetrics:
+    enabled: true
+    path: "/actuator/metrics"
+    interval: "10s"
+    endpoints:
+      - http.server.requests
+      - system.cpu.usage
+      - process.cpu.usage
+      - jvm.memory.used
+      - jvm.gc.pause
+      - hikaricp.connections
+
+  # Health check metrics
+  healthMetrics:
+    enabled: true
+    path: "/actuator/health"
+    interval: "30s"
+    components:
+      - db
+      - diskSpace
+      - ping
+      - livenessState
+      - readinessState
