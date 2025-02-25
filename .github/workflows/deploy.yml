@@ -1,0 +1,196 @@
+name: Deploy Umbrella Application
+
+on:
+  workflow_run:
+    workflows: ["build.yml"]
+    types: [completed]
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for deployment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+env:
+  HELM_VERSION: v3.13.2
+  KUBECONFIG: ${{ secrets.KUBE_CONFIG }}
+  HARBOR_REGISTRY: harbor.prcins.net
+  HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+  HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+  HELM_EXPERIMENTAL_OCI: 1
+
+jobs:
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment: development
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev' ||
+      github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Configure Kubernetes context
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ env.KUBECONFIG }}
+
+      - name: Login to Harbor registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: ${{ env.HARBOR_USERNAME }}
+          password: ${{ env.HARBOR_PASSWORD }}
+
+      - name: Deploy backend service
+        uses: azure/k8s-deploy@v4
+        with:
+          namespace: umbrella-dev
+          manifests: |
+            infrastructure/helm/umbrella/templates/
+          images: |
+            ${{ env.HARBOR_REGISTRY }}/umbrella/backend:${{ github.sha }}
+          strategy: rolling
+          helm-version: ${{ env.HELM_VERSION }}
+          set-values: |
+            backend.image.tag=${{ github.sha }}
+            backend.springProfiles=dev
+            backend.env.JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -Xmx2048m"
+
+      - name: Verify backend health
+        run: |
+          kubectl wait --for=condition=ready pod -l app=umbrella-backend -n umbrella-dev --timeout=300s
+          kubectl exec -n umbrella-dev deploy/umbrella-backend -- curl -f http://localhost:8080/actuator/health
+
+      - name: Deploy frontend application
+        uses: azure/k8s-deploy@v4
+        with:
+          namespace: umbrella-dev
+          manifests: |
+            infrastructure/helm/umbrella/templates/
+          images: |
+            ${{ env.HARBOR_REGISTRY }}/umbrella/web:${{ github.sha }}
+          strategy: rolling
+          helm-version: ${{ env.HELM_VERSION }}
+          set-values: |
+            web.image.tag=${{ github.sha }}
+
+  deploy-qa:
+    name: Deploy to QA
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: qa
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'qa' ||
+      github.event_name == 'workflow_run' && github.ref == 'refs/heads/develop'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Configure Kubernetes context
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ env.KUBECONFIG }}
+
+      - name: Deploy to QA
+        uses: azure/k8s-deploy@v4
+        with:
+          namespace: umbrella-qa
+          manifests: |
+            infrastructure/helm/umbrella/templates/
+          images: |
+            ${{ env.HARBOR_REGISTRY }}/umbrella/backend:${{ github.sha }}
+            ${{ env.HARBOR_REGISTRY }}/umbrella/web:${{ github.sha }}
+          strategy: rolling
+          helm-version: ${{ env.HELM_VERSION }}
+          set-values: |
+            backend.image.tag=${{ github.sha }}
+            backend.springProfiles=qa
+            backend.replicaCount=3
+            backend.resources.requests.memory=2Gi
+            web.image.tag=${{ github.sha }}
+            web.replicaCount=3
+
+      - name: Run integration tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app=umbrella-backend -n umbrella-qa --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=umbrella-web -n umbrella-qa --timeout=300s
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: deploy-qa
+    runs-on: ubuntu-latest
+    environment: production
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod' ||
+      github.event_name == 'workflow_run' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Configure Kubernetes context
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ env.KUBECONFIG }}
+
+      - name: Deploy to Production
+        uses: azure/k8s-deploy@v4
+        with:
+          namespace: umbrella-prod
+          manifests: |
+            infrastructure/helm/umbrella/templates/
+          images: |
+            ${{ env.HARBOR_REGISTRY }}/umbrella/backend:${{ github.sha }}
+            ${{ env.HARBOR_REGISTRY }}/umbrella/web:${{ github.sha }}
+          strategy: rolling
+          helm-version: ${{ env.HELM_VERSION }}
+          set-values: |
+            backend.image.tag=${{ github.sha }}
+            backend.springProfiles=prod
+            backend.replicaCount=4
+            backend.resources.requests.memory=3Gi
+            backend.autoscaling.minReplicas=4
+            backend.autoscaling.maxReplicas=8
+            web.image.tag=${{ github.sha }}
+            web.replicaCount=4
+            web.autoscaling.minReplicas=4
+            web.autoscaling.maxReplicas=8
+
+      - name: Verify deployment health
+        run: |
+          kubectl wait --for=condition=ready pod -l app=umbrella-backend -n umbrella-prod --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=umbrella-web -n umbrella-prod --timeout=300s
+          kubectl exec -n umbrella-prod deploy/umbrella-backend -- curl -f http://localhost:8080/actuator/health
+
+      - name: Run smoke tests
+        run: |
+          for i in {1..5}; do
+            curl -f https://umbrella.prcins.net/actuator/health || exit 1
+            sleep 10
+          done
