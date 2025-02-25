@@ -1,0 +1,124 @@
+spring:
+  profiles:
+    active: test
+  
+  application:
+    name: umbrella-insurance-test
+    profile: test
+    region: co1
+    agency: agency6
+
+  datasource:
+    primary:
+      url: jdbc:sqlserver://localhost:1433;databaseName=UMBRELLA_TEST
+      username: ${TEST_DB_USER}
+      password: ${TEST_DB_PASSWORD}
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 300000
+        thread-factory:
+          virtual: true
+
+    secondary:
+      url: jdbc:db2://localhost:50000/UMBRELLA_TEST
+      username: ${TEST_DB2_USER}
+      password: ${TEST_DB2_PASSWORD}
+      driver-class-name: com.ibm.db2.jcc.DB2Driver
+      hikari:
+        maximum-pool-size: 10
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 300000
+        thread-factory:
+          virtual: true
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+      show-sql: true
+      format-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLServerDialect
+        format_sql: true
+        generate_statistics: true
+
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+
+  test:
+    database:
+      replace: none
+    context:
+      thread-factory:
+        virtual: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - metrics
+          - prometheus
+          - loggers
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+      tags:
+        environment: test
+
+logging:
+  level:
+    root: INFO
+    com.prcins.umbrella: DEBUG
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE
+
+integration:
+  policystar:
+    url: mock://policystar-test
+    timeout: 5000
+    virtual-threads: true
+  rmv:
+    url: mock://rmv-test
+    timeout: 5000
+    virtual-threads: true
+  speedpay:
+    url: mock://speedpay-test
+    timeout: 5000
+    virtual-threads: true
+  clue:
+    url: mock://clue-test
+    timeout: 5000
+    virtual-threads: true
+
+container:
+  test:
+    enabled: true
+    health:
+      readiness:
+        path: /actuator/health/readiness
+      liveness:
+        path: /actuator/health/liveness
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+    resources:
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+      requests:
+        memory: 512Mi
+        cpu: 500m
