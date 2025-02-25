@@ -1,0 +1,146 @@
+# Kubernetes namespace configuration for ai_umbrella application
+# Defines logical partitions for application components with Spring Boot 3.2.x deployment requirements
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: umbrella-dev
+  labels:
+    environment: development
+    app: umbrella
+    managed-by: kubernetes
+    version: 3.2.x
+  annotations:
+    kubernetes.io/description: "Development environment for ai_umbrella application"
+    umbrella.prcins.net/spring-boot-version: "3.2.x"
+    umbrella.prcins.net/java-version: "21"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: umbrella-qa
+  labels:
+    environment: qa
+    app: umbrella
+    managed-by: kubernetes
+    version: 3.2.x
+  annotations:
+    kubernetes.io/description: "QA environment for ai_umbrella application"
+    umbrella.prcins.net/spring-boot-version: "3.2.x"
+    umbrella.prcins.net/java-version: "21"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: umbrella-prod
+  labels:
+    environment: production
+    app: umbrella
+    managed-by: kubernetes
+    version: 3.2.x
+  annotations:
+    kubernetes.io/description: "Production environment for ai_umbrella application"
+    umbrella.prcins.net/spring-boot-version: "3.2.x"
+    umbrella.prcins.net/java-version: "21"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: umbrella-monitoring
+  labels:
+    purpose: monitoring
+    app: umbrella
+    managed-by: kubernetes
+    version: 3.2.x
+  annotations:
+    kubernetes.io/description: "Monitoring namespace for ai_umbrella application"
+    umbrella.prcins.net/actuator-endpoints: "health,metrics,prometheus,loggers"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: umbrella-logging
+  labels:
+    purpose: logging
+    app: umbrella
+    managed-by: kubernetes
+    version: 3.2.x
+  annotations:
+    kubernetes.io/description: "Logging namespace for ai_umbrella application"
+    umbrella.prcins.net/log-format: "json"
+    umbrella.prcins.net/log-pattern: "ecs"
+spec:
+  finalizers:
+    - kubernetes
+
+---
+# Network Policies for namespace isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: umbrella-dev
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring
+  namespace: umbrella-monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: development
+        - namespaceSelector:
+            matchLabels:
+              environment: qa
+        - namespaceSelector:
+            matchLabels:
+              environment: production
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-logging
+  namespace: umbrella-logging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: development
+        - namespaceSelector:
+            matchLabels:
+              environment: qa
+        - namespaceSelector:
+            matchLabels:
+              environment: production
