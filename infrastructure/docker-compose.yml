@@ -1,0 +1,187 @@
+version: '3.8'
+
+services:
+  # Backend Service with Spring Boot 3.2.x and Java 21
+  umbrella-backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    container_name: umbrella-backend
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=--enable-preview -XX:+UseZGC -XX:+ZGenerational -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75.0
+      - SERVER_PORT=8080
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,prometheus,loggers
+      - MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - LOGGING_LEVEL_ROOT=INFO
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src/backend/logs:/app/logs
+      - ./src/backend/config:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    networks:
+      - umbrella_network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: umbrella.backend
+
+  # Frontend UI Service
+  umbrella-frontend:
+    build:
+      context: ./src/web
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+        - API_URL=http://umbrella-backend:8080
+    container_name: umbrella-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - umbrella-backend
+    networks:
+      - umbrella_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: umbrella-prometheus
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - umbrella_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:9.5.0
+    container_name: umbrella-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - umbrella_network
+
+  # Elasticsearch for Logging
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: umbrella-elasticsearch
+    volumes:
+      - ./infrastructure/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      - node.name=umbrella-es01
+      - cluster.name=umbrella-elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=changeme
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - umbrella_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status.*green'"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  # Kibana for Log Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: umbrella-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=changeme
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - umbrella_network
+
+  # Fluentd for Log Collection
+  fluentd:
+    image: fluent/fluentd:v1.16
+    container_name: umbrella-fluentd
+    volumes:
+      - fluentd_data:/fluentd/log
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    networks:
+      - umbrella_network
+
+networks:
+  umbrella_network:
+    driver: bridge
+    name: umbrella_network
+    enable_ipv6: true
+    driver_opts:
+      com.docker.network.enable_ipv6: "true"
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  fluentd_data:
+    driver: local
