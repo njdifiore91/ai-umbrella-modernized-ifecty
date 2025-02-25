@@ -1,0 +1,130 @@
+# Production Environment Configuration for Umbrella Insurance Application
+# Spring Boot 3.2.1 with embedded Tomcat 10.1.18 and Java 21 Virtual Threads support
+
+spring:
+  application:
+    name: umbrella-insurance
+    environment: production
+
+  # Enable Virtual Threads for improved performance in production
+  threads:
+    virtual:
+      enabled: true
+
+  # Production database configurations
+  datasource:
+    primary:
+      url: ${PRIMARY_DB_URL}
+      username: ${PRIMARY_DB_USER}
+      password: ${PRIMARY_DB_PASSWORD}
+      driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      type: com.zaxxer.hikari.HikariDataSource
+      hikari:
+        maximum-pool-size: 50
+        minimum-idle: 10
+        idle-timeout: 300000
+        connection-timeout: 20000
+        pool-name: PrimaryHikariPool
+    secondary:
+      url: ${SECONDARY_DB_URL}
+      username: ${SECONDARY_DB_USER}
+      password: ${SECONDARY_DB_PASSWORD}
+      driver-class-name: com.ibm.db2.jcc.DB2Driver
+      hikari:
+        maximum-pool-size: 30
+        minimum-idle: 5
+        idle-timeout: 300000
+        connection-timeout: 20000
+        pool-name: SecondaryHikariPool
+
+  # JPA production optimizations
+  jpa:
+    properties:
+      hibernate.generate_statistics: false
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_updates: true
+      hibernate.jdbc.time_zone: UTC
+
+# Production server configuration
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 400
+      min-spare: 20
+    accept-count: 100
+    max-connections: 8192
+    connection-timeout: 20000
+
+# Production monitoring configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - metrics
+          - prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      environment: production
+      application: umbrella-insurance
+
+# Production logging configuration
+logging:
+  level:
+    root: INFO
+    com.prcins.umbrella: INFO
+    org.springframework: INFO
+    org.hibernate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/umbrella/application.log
+    max-size: 100MB
+    max-history: 30
+
+# External service integration configuration
+integration:
+  policystar:
+    url: https://policynetest.prcins.net/services/policystar
+    timeout: 30000
+    retry:
+      max-attempts: 3
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 10000
+  rmv:
+    url: https://apimstest.prcins.net/rmv
+    timeout: 20000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
+  speedpay:
+    url: https://apimstest.prcins.net/speedpay
+    timeout: 15000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
+  clue:
+    url: https://apimstest.prcins.net/clue
+    timeout: 20000
+    retry:
+      max-attempts: 2
+      backoff:
+        initial: 1000
+        multiplier: 2
+        max: 5000
