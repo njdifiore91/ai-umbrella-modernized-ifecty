@@ -1,0 +1,51 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Default settings for all files
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Java and XML files optimized for Java 21 and Spring Boot 3.2.x development
+[*.{java,xml}]
+indent_style = space
+indent_size = 4
+continuation_indent_size = 8
+max_line_length = 120
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+ij_java_use_single_class_imports = true
+ij_java_insert_inner_class_imports = true
+
+# TypeScript, JavaScript, JSON and YAML files optimized for container-first development
+[*.{ts,tsx,js,jsx,json,yml,yaml}]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+quote_type = single
+space_before_function_paren = true
+object_curly_spacing = true
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Container-related files
+[{Dockerfile,docker-compose.yml,docker-compose.*.yml}]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+# Kubernetes manifests and other YAML configurations
+[*.{yaml,yml}]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+quote_type = single
