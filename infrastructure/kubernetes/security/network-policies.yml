@@ -1,0 +1,149 @@
+# Network policies for ai_umbrella application
+# Kubernetes version: 1.28
+# Purpose: Define network security and access control policies for containerized services
+
+---
+# Default deny-all policy as security baseline
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}  # Applies to all pods in namespace
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Allow communication between backend services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-services
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: umbrella-backend
+      component: service
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: umbrella-backend
+    ports:
+    - protocol: TCP
+      port: 8080  # HTTP service port
+    - protocol: TCP
+      port: 8443  # HTTPS service port
+    - protocol: TCP
+      port: 8081
+      endPort: 8085  # Range for additional service ports
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: umbrella-backend
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+
+---
+# Allow frontend to backend communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-backend
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: umbrella-backend
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: umbrella-frontend
+    ports:
+    - protocol: TCP
+      port: 8080  # HTTP service port
+    - protocol: TCP
+      port: 8443  # HTTPS service port
+    - protocol: TCP
+      port: 8081
+      name: health-check  # Spring Boot Actuator health endpoint
+    - protocol: TCP
+      port: 9090
+      name: metrics  # Metrics endpoint
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: umbrella-frontend
+    ports:
+    - protocol: TCP
+      port: 3000  # Frontend service port
+
+---
+# Allow monitoring service access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring
+  namespace: default
+spec:
+  podSelector: {}  # Applies to all pods
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+          type: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+      name: http-metrics
+    - protocol: TCP
+      port: 9090
+      name: prometheus
+    - protocol: TCP
+      port: 8081
+      name: health
+
+---
+# Restricted network access policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restricted-network-access
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      security-level: restricted
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          security-level: restricted
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          security-level: restricted
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8443
