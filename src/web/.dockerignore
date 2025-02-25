@@ -1,0 +1,122 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnp.*
+.yarn/
+
+# Development
+.git/
+.gitignore
+.env*
+*.key
+*.pem
+.npmrc
+.yarnrc
+.pnpmrc
+
+# Testing
+coverage/
+__tests__/
+*.test.*
+*.spec.*
+junit.xml
+.nyc_output/
+vitest.config.*
+jest.config.*
+
+# Build
+build/
+dist/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.webpack/
+stats.json
+
+# Development Tools
+.vscode/
+.idea/
+.storybook/
+storybook-static/
+.eslintcache
+.stylelintcache
+.prettierrc*
+.eslintrc*
+*.config.js
+*.config.ts
+tsconfig*.json
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*
+*.dockerfile
+
+# Documentation
+*.md
+docs/
+CHANGELOG
+LICENSE
+AUTHORS
+
+# Logs and Debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+.debug/
+
+# System Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Source Control
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab/
+
+# Editor Configuration
+.editorconfig
+.prettierrc
+.eslintrc
+.stylelintrc
+.browserslistrc
+
+# Test Coverage and Reports
+coverage/
+.coverage/
+coverage.json
+.coveralls.yml
+.nycrc
+test-results/
+reports/
+
+# Temporary Files
+tmp/
+temp/
+.tmp/
+*.tmp
+*.bak
+
+# Miscellaneous
+.husky/
+.commitlintrc
+.czrc
+.releaserc
+.travis.yml
+.circleci/
+.jenkins*
+.sonarqube/
