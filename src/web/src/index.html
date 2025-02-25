@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="Enterprise-grade insurance domain application for comprehensive insurance management capabilities">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer-policy" content="strict-origin-when-cross-origin">
+    <meta name="application-name" content="ai_umbrella Insurance Management">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <!-- Monitoring endpoints -->
+    <meta name="monitoring-endpoint" content="/actuator/metrics">
+    <meta name="health-endpoint" content="/actuator/health">
+
+    <!-- PWA support -->
+    <link rel="icon" href="favicon.ico">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Application title -->
+    <title>ai_umbrella Insurance Management</title>
+
+    <!-- React dependencies with enhanced security attributes -->
+    <script 
+        src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" 
+        integrity="sha384-tMH8h3BGESGckSAVGZ82T9n90ztNXxvdwvdM6UoR4vqKIl8bQxn8OZr0q5QV8j6"
+        crossorigin="anonymous"
+        defer>
+    </script>
+    <script 
+        src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"
+        integrity="sha384-bm7MnzvK++/YVxK1mgXh8yg4uW1y0B2E1RaFc/LAEEenLHBD5jLQtXfwnKLtQZS"
+        crossorigin="anonymous" 
+        defer>
+    </script>
+
+    <!-- Application entry point -->
+    <script type="module" src="./index.tsx" defer></script>
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this application.</noscript>
+    
+    <!-- Root element for React application with monitoring attributes -->
+    <div 
+        id="root" 
+        role="main"
+        data-monitoring-endpoint="/actuator/metrics"
+        data-health-endpoint="/actuator/health">
+    </div>
+</body>
+</html>
