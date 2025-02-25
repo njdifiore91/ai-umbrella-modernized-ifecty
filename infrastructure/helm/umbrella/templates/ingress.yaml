@@ -1,0 +1,96 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ template "umbrella.fullname" . }}
+  labels: {{ template "umbrella.labels" . }}
+  annotations:
+    # Basic ingress configuration
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    
+    # Enhanced timeouts for Virtual Threads support
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    
+    # Buffer configuration for Spring Boot responses
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    
+    # Spring Boot specific headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-Port $server_port;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    
+    # CORS configuration for API endpoints
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    
+    # Spring Boot Actuator specific configuration
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /actuator {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://{{ template "umbrella.fullname" . }}-backend:8081;
+      }
+
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          # Backend API paths
+          - path: /api(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ template "umbrella.fullname" $ }}-backend
+                port:
+                  number: 8080
+
+          # Spring Boot Actuator endpoints
+          - path: /actuator(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ template "umbrella.fullname" $ }}-backend
+                port:
+                  number: 8081
+
+          # Health check endpoints
+          - path: /health(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ template "umbrella.fullname" $ }}-backend
+                port:
+                  number: 8081
+
+          # Web frontend paths
+          - path: /(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ template "umbrella.fullname" $ }}-web
+                port:
+                  number: 8080
+    {{- end }}
