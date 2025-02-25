@@ -1,0 +1,140 @@
+# Pod Security Policies for ai_umbrella application
+# Version: 1.28
+# Purpose: Define security contexts and requirements for Spring Boot 3.2.x containerized workloads
+
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: MustRunAsNonRoot
+    ranges:
+      - min: 1000
+        max: 65535
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+  readOnlyRootFilesystem: true
+  seccompProfile:
+    type: RuntimeDefault
+  forbiddenSysctls:
+    - '*'
+
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: privileged
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'unconfined'
+    kubernetes.io/description: 'Privileged policy for system workloads only'
+spec:
+  privileged: true
+  allowPrivilegeEscalation: true
+  allowedCapabilities:
+    - NET_ADMIN
+    - SYS_TIME
+    - SYS_ADMIN
+  volumes:
+    - '*'
+  hostNetwork: true
+  hostIPC: true
+  hostPID: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  readOnlyRootFilesystem: false
+  seccompProfile:
+    type: Unconfined
+
+---
+# Security Context Templates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-contexts
+data:
+  backend-context: |
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+  frontend-context: |
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      fsGroup: 1001
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+---
+# Validation Rules ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-validation-rules
+data:
+  restricted-policy: |
+    enforce_non_root: true
+    require_readonly_fs: true
+    drop_capabilities: true
+    restrict_volume_types: true
+    prevent_privilege_escalation: true
+    enforce_seccomp: true
+    validate_host_paths: true
+    require_security_context: true
+
+  privileged-policy: |
+    limit_to_system_namespaces: true
+    require_security_review: true
+    audit_privileged_operations: true
+    restrict_to_authorized_users: true
+    log_security_events: true
+    enforce_namespace_restrictions: true
