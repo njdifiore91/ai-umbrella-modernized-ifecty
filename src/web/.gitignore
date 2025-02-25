@@ -1,0 +1,55 @@
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+build/
+dist/
+.cache/
+.next/
+.nuxt/
+.gatsby/
+.parcel-cache/
+.webpack/
+storybook-static/
+
+# Test coverage
+coverage/
+.nyc_output/
+junit.xml
+test-report.xml
+
+# Environment files
+.env*
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor and IDE files
+.idea/
+.vscode/
+.vs/
+*.sublime-*
+*.swp
+*.swo
+.history/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Caches
+.stylelintcache
+.eslintcache
