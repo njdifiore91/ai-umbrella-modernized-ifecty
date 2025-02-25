@@ -1,0 +1,100 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/backend/**'
+      - 'src/web/**'
+      - '.github/workflows/**'
+      - 'pom.xml'
+      - 'package.json'
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '18.x'
+  MAVEN_OPTS: '-Xmx3072m'
+  NODE_OPTIONS: '--max-old-space-size=4096'
+  SONAR_HOST: 'https://sonar.prcins.net'
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Validate Backend
+        working-directory: src/backend
+        run: |
+          mvn --batch-mode verify \
+            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.host.url=${{ env.SONAR_HOST }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.projectKey=umbrella-backend \
+            -Dsonar.java.source=${{ env.JAVA_VERSION }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+            -Dsonar.junit.reportPaths=target/surefire-reports \
+            -Dsonar.tests=src/test/java \
+            -Dsonar.test.inclusions=**/*Test.java,**/*Tests.java \
+            -Dsonar.qualitygate.wait=true
+
+      - name: Validate Frontend
+        working-directory: src/web
+        run: |
+          npm ci
+          npm run lint
+          npm run type-check
+          npm run test:coverage
+          npm run test:a11y
+          npm run security-audit
+          npm run build
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            src/backend/target/surefire-reports/
+            src/web/coverage/
+
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-reports
+          path: |
+            src/backend/target/site/jacoco/
+            src/web/coverage/
+
+      - name: Check Quality Gate
+        if: failure()
+        run: |
+          echo "Quality gate failed. Please check SonarQube report at ${{ env.SONAR_HOST }}/dashboard?id=umbrella-backend"
+          exit 1
