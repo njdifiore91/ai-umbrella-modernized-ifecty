@@ -1,0 +1,79 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: umbrella-backend-vpa
+  namespace: umbrella
+  labels:
+    app: umbrella-backend
+    tier: backend
+    component: spring-boot
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: umbrella-backend
+  updatePolicy:
+    updateMode: Auto
+  resourcePolicy:
+    containerPolicies:
+      - containerName: umbrella-backend
+        minAllowed:
+          cpu: "500m"
+          memory: "1Gi"
+        maxAllowed:
+          cpu: "4"
+          memory: "8Gi"
+        controlledResources:
+          - cpu
+          - memory
+        controlledValues: RequestsAndLimits
+        scalingPolicy:
+          cpuScalingPolicy:
+            periodicScaling:
+              stabilizationWindowSeconds: 300
+              minChangePct: 10
+              maxChangePct: 100
+          memoryScalingPolicy:
+            periodicScaling:
+              stabilizationWindowSeconds: 600
+              minChangePct: 20
+              maxChangePct: 50
+  recommenders:
+    - name: default
+      config:
+        metricSources:
+          - name: actuator
+            type: prometheus
+            address: http://prometheus:9090
+            query: >
+              max(
+                jvm_memory_used_bytes{application="umbrella-backend"},
+                process_cpu_usage{application="umbrella-backend"}
+              )
+  podResourcePolicy:
+    initContainers:
+      - containerName: spring-boot-init
+        minAllowed:
+          cpu: "250m"
+          memory: "512Mi"
+        maxAllowed:
+          cpu: "1"
+          memory: "1Gi"
+    containers:
+      - containerName: umbrella-backend
+        minAllowed:
+          cpu: "500m"
+          memory: "1Gi"
+        maxAllowed:
+          cpu: "4"
+          memory: "8Gi"
+        controlledValues: RequestsAndLimits
+        resourceScaling:
+          cpu:
+            min: "500m"
+            max: "4"
+            target: "80"
+          memory:
+            min: "1Gi"
+            max: "8Gi"
+            target: "75"
