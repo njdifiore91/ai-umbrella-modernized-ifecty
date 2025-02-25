@@ -1,0 +1,249 @@
+# Harbor Container Registry Deployment for ai_umbrella
+# Version: v2.9.1
+# Enhanced configuration for Spring Boot 3.2.x and Java 21 containers
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor
+  labels:
+    app: harbor
+    environment: production
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbor-config
+  namespace: harbor
+data:
+  HARBOR_ADMIN: "admin"
+  CORE_URL: "http://harbor-core:8080"
+  TOKEN_SERVICE_URL: "http://harbor-core:8080/service/token"
+  REGISTRY_URL: "http://harbor-registry:5000"
+  REGISTRY_CONTROLLER_URL: "http://harbor-registry:8080"
+  POSTGRESQL_HOST: "harbor-database"
+  POSTGRESQL_PORT: "5432"
+  POSTGRESQL_DATABASE: "registry"
+  REGISTRY_STORAGE_PROVIDER_NAME: "filesystem"
+  REGISTRY_STORAGE_PROVIDER_PATH: "/storage"
+  # Spring Boot specific configurations
+  SPRING_BOOT_SCANNING_ENABLED: "true"
+  SPRING_BOOT_BASE_IMAGES: "eclipse-temurin:21-jre-jammy"
+  VULNERABILITY_SCANNING_SKIP_UPDATE: "false"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbor-core
+  namespace: harbor
+  labels:
+    app: harbor
+    component: core
+    version: v2.9.1
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: harbor
+      component: core
+  template:
+    metadata:
+      labels:
+        app: harbor
+        component: core
+    spec:
+      containers:
+        - name: harbor-core
+          image: goharbor/harbor-core:v2.9.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: CORE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-core
+                  key: secret
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-database
+                  key: password
+            # Spring Boot container support
+            - name: SPRING_BOOT_SCANNING_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: harbor-config
+                  key: SPRING_BOOT_SCANNING_ENABLED
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          livenessProbe:
+            httpGet:
+              path: /api/v2.0/health
+              port: 8080
+            initialDelaySeconds: 300
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v2.0/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/core/app.conf
+              subPath: app.conf
+            - name: secret-key
+              mountPath: /etc/core/key
+              subPath: key
+            - name: token-service-private-key
+              mountPath: /etc/core/private_key.pem
+              subPath: tls.key
+            - name: ca-bundle
+              mountPath: /etc/harbor/ssl/ca-bundle.crt
+              subPath: ca-bundle.crt
+      volumes:
+        - name: config
+          configMap:
+            name: harbor-core
+        - name: secret-key
+          secret:
+            secretName: harbor-core
+            items:
+              - key: secretKey
+                path: key
+        - name: token-service-private-key
+          secret:
+            secretName: harbor-core
+        - name: ca-bundle
+          configMap:
+            name: harbor-core
+            items:
+              - key: ca-bundle.crt
+                path: ca-bundle.crt
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-core
+  namespace: harbor
+  labels:
+    app: harbor
+    component: core
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: harbor
+    component: core
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: harbor-database
+  namespace: harbor
+spec:
+  serviceName: harbor-database
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harbor
+      component: database
+  template:
+    metadata:
+      labels:
+        app: harbor
+        component: database
+    spec:
+      containers:
+        - name: harbor-database
+          image: goharbor/harbor-db:v2.9.1
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-database
+                  key: password
+          volumeMounts:
+            - name: database-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+  volumeClaimTemplates:
+    - metadata:
+        name: database-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-database
+  namespace: harbor
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: harbor
+    component: database
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor
+  namespace: harbor
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  rules:
+    - host: harbor.prcins.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-core
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - harbor.prcins.net
+      secretName: harbor-tls
