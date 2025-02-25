@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: umbrella-web-service
+  namespace: umbrella
+  labels:
+    app: umbrella-web
+    environment: ${ENV}
+    version: ${VERSION}
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8081"
+    prometheus.io/path: "/actuator/prometheus"
+    # Service metadata
+    service.kubernetes.io/version: ${VERSION}
+    # Health check configuration
+    health.check.path: "/actuator/health"
+    # Description
+    description: "Web frontend service for Umbrella application with monitoring capabilities"
+    # Last updated timestamp
+    lastUpdated: ${TIMESTAMP}
+
+spec:
+  type: ClusterIP
+  # Port configuration for different service endpoints
+  ports:
+    # Main application traffic
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    
+    # Spring Boot Actuator metrics endpoint
+    - name: metrics
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+    
+    # Health check endpoint
+    - name: health
+      port: 8082
+      targetPort: 8081
+      protocol: TCP
+
+  # Pod selector based on deployment labels
+  selector:
+    app: umbrella-web
+    version: ${VERSION}
+
+  # Session affinity configuration
+  sessionAffinity: None
+
+  # Publishing configuration
+  publishNotReadyAddresses: false
+
+  # Internal traffic policy
+  internalTrafficPolicy: Cluster
+
+  # Health check configuration
+  healthCheckNodePort: 0
