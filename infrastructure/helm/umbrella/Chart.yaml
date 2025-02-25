@@ -1,0 +1,48 @@
+apiVersion: v2
+name: umbrella
+description: Enterprise-grade insurance management platform leveraging Spring Boot 3.2.x with embedded Tomcat 10.1.18 and Java 21 Virtual Threads for optimal container-native deployment
+version: 1.0.0
+appVersion: 1.0.0
+
+dependencies:
+  - name: backend
+    repository: file://../umbrella-backend
+    version: 1.0.0
+    condition: backend.enabled
+    tags:
+      - backend
+      - spring-boot
+      - java21
+      - virtual-threads
+
+  - name: web
+    repository: file://../umbrella-web
+    version: 1.0.0
+    condition: web.enabled
+    tags:
+      - web
+      - ui
+      - frontend
+
+maintainers:
+  - name: Enterprise Support Team
+    email: support@prcins.net
+    url: https://support.prcins.net
+
+keywords:
+  - insurance
+  - spring-boot-3.2
+  - java-21
+  - virtual-threads
+  - embedded-tomcat
+  - container-native
+  - kubernetes
+  - enterprise
+  - cloud-ready
+  - scalable
+
+annotations:
+  artifacthub.io/containsSecurityUpdates: "true"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/license: proprietary
+  artifacthub.io/recommendations: "true"
