@@ -1,0 +1,173 @@
+# Kubernetes ConfigMap definitions for Umbrella application
+# Version: 1.0.0
+# Provides environment-specific configurations for both backend and frontend components
+# Supports Spring Boot 3.2.x with embedded Tomcat 10.1.18 and Jakarta EE migration
+
+---
+# Backend Application ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: umbrella-backend-config
+  namespace: umbrella
+  labels:
+    app: umbrella-backend
+    environment: ${ENVIRONMENT}
+    version: ${VERSION}
+  annotations:
+    description: "Backend configuration for Umbrella application"
+data:
+  application.yml: |
+    spring:
+      application:
+        name: umbrella
+      
+      # Enable Virtual Threads for Java 21
+      threads:
+        virtual:
+          enabled: true
+      
+      # Server Configuration with Embedded Tomcat 10.1.18
+      server:
+        port: 8080
+        servlet:
+          context-path: /api
+        tomcat:
+          threads:
+            max: 200
+          max-connections: 8192
+          accept-count: 100
+          connection-timeout: 20000
+
+      # Spring Boot Actuator Configuration
+      management:
+        endpoints:
+          web:
+            exposure:
+              include: health,metrics,prometheus,loggers,env
+        endpoint:
+          health:
+            probes:
+              enabled: true
+            show-details: always
+            group:
+              readiness:
+                include: readinessState,db,integration
+              liveness:
+                include: livenessState
+        metrics:
+          tags:
+            application: umbrella
+          distribution:
+            percentiles-histogram:
+              http.server.requests: true
+
+      # Integration Endpoints
+      integration:
+        policystar:
+          url: ${POLICYSTAR_URL}
+          timeout: 30000
+          retry-attempts: 3
+        rmv:
+          url: ${RMV_URL}
+          timeout: 20000
+        speedpay:
+          url: ${SPEEDPAY_URL}
+          timeout: 30000
+        clue:
+          url: ${CLUE_URL}
+          timeout: 20000
+
+      # Logging Configuration with ECS Layout
+      logging:
+        pattern:
+          console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId},%X{spanId}] %-5level %logger{36} - %msg%n"
+        file:
+          name: /var/log/umbrella/application.log
+        level:
+          root: INFO
+          com.prcins.umbrella: INFO
+
+---
+# Frontend Application ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: umbrella-web-config
+  namespace: umbrella
+  labels:
+    app: umbrella-web
+    environment: ${ENVIRONMENT}
+    version: ${VERSION}
+  annotations:
+    description: "Web frontend configuration for Umbrella application"
+data:
+  api.json: |
+    {
+      "base_url": "https://apimstest.prcins.net/umbrellacore/api/v1",
+      "timeout": 60000,
+      "retry_attempts": 3,
+      "circuit_breaker": {
+        "failure_threshold": 50,
+        "reset_timeout": 30000
+      },
+      "rate_limit": {
+        "requests_per_second": 100,
+        "burst": 150
+      }
+    }
+
+  nginx.conf: |
+    client_max_body_size 50m;
+    client_body_timeout 60s;
+    keepalive_timeout 65s;
+    gzip on;
+    server_tokens off;
+
+    server {
+      listen 80;
+      server_name umbrella-web;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      error_page 404 /404.html;
+      error_page 500 502 503 504 /50x.html;
+    }
+
+  security.json: |
+    {
+      "content_security_policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+      "frame_options": "SAMEORIGIN",
+      "xss_protection": "1; mode=block",
+      "hsts": "max-age=31536000; includeSubDomains",
+      "referrer_policy": "strict-origin-when-cross-origin",
+      "permissions_policy": "camera=(), microphone=(), geolocation=()"
+    }
+
+  validation.json: |
+    {
+      "patterns": {
+        "email": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+        "ssn": "^\\d{3}-\\d{2}-\\d{4}$",
+        "phone": "^\\d{3}-\\d{3}-\\d{4}$",
+        "policy_number": "^POL-\\d{4}-\\d{6}$",
+        "claim_number": "^CLM-\\d{4}-\\d{3}$"
+      },
+      "max_file_size": 10485760,
+      "max_policy_amount": 10000000,
+      "min_policy_amount": 1000,
+      "allowed_file_types": ".pdf,.jpg,.png,.doc,.docx"
+    }
+
+  features.json: |
+    {
+      "enable_caching": true,
+      "enable_compression": true,
+      "enable_metrics": true,
+      "enable_health_check": true,
+      "enable_tracing": true
+    }
