@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: umbrella-backend-service
+  namespace: umbrella
+  labels:
+    app: umbrella-backend
+    tier: backend
+  annotations:
+    service.beta.kubernetes.io/description: "Spring Boot 3.2.x backend service with embedded Tomcat 10.1.18"
+    service.beta.kubernetes.io/version: "3.2.x"
+    service.beta.kubernetes.io/monitoring: "enabled"
+    service.beta.kubernetes.io/actuator-path: "/actuator"
+    service.beta.kubernetes.io/health-check-path: "/actuator/health"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+      appProtocol: http
+    - name: actuator
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+      appProtocol: http
+  selector:
+    app: umbrella-backend
+  sessionAffinity: None
+  publishNotReadyAddresses: false
+  internalTrafficPolicy: Cluster
