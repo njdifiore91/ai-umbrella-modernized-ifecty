@@ -1,0 +1,179 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana-deployment
+  namespace: umbrella
+  labels:
+    app: kibana
+    component: logging
+  annotations:
+    description: "Kibana visualization platform for centralized logging with Spring Boot integration"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: kibana
+      component: logging
+  template:
+    metadata:
+      labels:
+        app: kibana
+        component: logging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5601"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: kibana
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.17.0
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        - name: SERVER_NAME
+          value: "umbrella-kibana"
+        - name: XPACK_SECURITY_ENABLED
+          value: "true"
+        - name: LOGGING_VERBOSE
+          value: "true"
+        - name: ELASTICSEARCH_SERVICEACCOUNT
+          valueFrom:
+            secretKeyRef:
+              name: kibana-elasticsearch-credentials
+              key: serviceaccount
+        - name: KIBANA_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kibana-secrets
+              key: encryption-key
+        resources:
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        - name: kibana-data
+          mountPath: /usr/share/kibana/data
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config
+      - name: kibana-data
+        persistentVolumeClaim:
+          claimName: kibana-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-service
+  namespace: umbrella
+  labels:
+    app: kibana
+    component: logging
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5601
+    targetPort: 5601
+    protocol: TCP
+    name: http
+  selector:
+    app: kibana
+    component: logging
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kibana-data
+  namespace: umbrella
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kibana-network-policy
+  namespace: umbrella
+spec:
+  podSelector:
+    matchLabels:
+      app: kibana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: umbrella
+    ports:
+    - protocol: TCP
+      port: 5601
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: elasticsearch
+    ports:
+    - protocol: TCP
+      port: 9200
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kibana-pdb
+  namespace: umbrella
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: kibana
