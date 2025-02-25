@@ -1,0 +1,140 @@
+# Backend Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: umbrella-backend-role
+  namespace: default
+rules:
+  # Access to core resources
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  # Access to pod operations
+  - apiGroups: [""]
+    resources: ["pods/log", "pods/exec"]
+    verbs: ["get", "list", "watch"]
+  # Access to actuator endpoints
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get"]
+    resourceNames: ["actuator", "health", "metrics", "prometheus"]
+  # Access to workload resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+---
+# Frontend Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: umbrella-frontend-role
+  namespace: default
+rules:
+  # Access to configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Access to health endpoints
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get"]
+    resourceNames: ["health", "info"]
+---
+# Monitoring ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: umbrella-monitoring-role
+rules:
+  # Access to core monitoring resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  # Access to metrics endpoints
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get"]
+    resourceNames: ["actuator", "metrics", "prometheus"]
+  # Access to ingress resources
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+---
+# Service Accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: umbrella-backend-sa
+  namespace: default
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: umbrella-frontend-sa
+  namespace: default
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: umbrella-monitoring-sa
+  namespace: monitoring
+---
+# Role Bindings
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: umbrella-backend-binding
+  namespace: default
+roleRef:
+  kind: Role
+  name: umbrella-backend-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: umbrella-backend-sa
+    namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: umbrella-frontend-binding
+  namespace: default
+roleRef:
+  kind: Role
+  name: umbrella-frontend-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: umbrella-frontend-sa
+    namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: umbrella-psp-binding
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: psp:restricted
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: umbrella-backend-sa
+    namespace: default
+  - kind: ServiceAccount
+    name: umbrella-frontend-sa
+    namespace: default
+---
+# Cluster Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: umbrella-monitoring-binding
+roleRef:
+  kind: ClusterRole
+  name: umbrella-monitoring-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: umbrella-monitoring-sa
+    namespace: monitoring
